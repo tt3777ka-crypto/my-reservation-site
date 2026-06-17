@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>オーナー管理画面 - 予約一覧</title>
+<style>
+  :root {
+    --bg-grad: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    --purple: #a78bfa;
+    --green: #34d399;
+    --red: #f87171;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg-grad);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #fff;
+  }
+
+  button { font-family: inherit; }
+  button:not([disabled]):hover { filter: brightness(1.2); }
+  input::placeholder { color: rgba(255,255,255,0.25); }
+
+  .center-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .login-box {
+    background: linear-gradient(145deg, #1e1b4b, #1e293b);
+    border: 1px solid rgba(167,139,250,0.3);
+    border-radius: 16px;
+    padding: 32px 28px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
+  }
+
+  .login-box h1 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    background: linear-gradient(90deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .login-box .sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    margin: 0 0 24px;
+  }
+
+  .field { margin-bottom: 16px; }
+
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 6px;
+  }
+
+  .field input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .field input:focus { border-color: var(--purple); }
+  .field input.error { border-color: var(--red); }
+
+  .login-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(124,58,237,0.4);
+    margin-top: 8px;
+  }
+
+  .login-btn.loading {
+    background: rgba(167,139,250,0.4);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .login-error {
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.4);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: #fca5a5;
+    margin-bottom: 16px;
+  }
+
+  /* ── Dashboard ── */
+  .header {
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .logout-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.8);
+    border-radius: 8px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .content { padding: 24px; max-width: 900px; margin: 0 auto; }
+
+  .nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .nav-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.8);
+    border-radius: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .nav-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.8);
+    min-width: 180px;
+    text-align: center;
+  }
+
+  .day-group {
+    margin-bottom: 24px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .day-group-header {
+    padding: 12px 18px;
+    background: rgba(255,255,255,0.05);
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .day-group-header .count {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--green);
+    background: rgba(52,211,153,0.12);
+    border-radius: 6px;
+    padding: 2px 10px;
+  }
+
+  .booking-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 18px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    font-size: 13px;
+  }
+
+  .booking-row .time {
+    font-weight: 700;
+    color: var(--purple);
+    min-width: 56px;
+  }
+
+  .booking-row .name {
+    font-weight: 600;
+    flex: 1;
+  }
+
+  .booking-row .phone {
+    color: rgba(255,255,255,0.6);
+  }
+
+  .empty-day {
+    padding: 16px 18px;
+    color: rgba(255,255,255,0.35);
+    font-size: 13px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .loading-msg {
+    text-align: center;
+    padding: 60px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .back-link {
+    display: inline-block;
+    margin-top: 16px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    text-decoration: none;
+  }
+  .back-link:hover { color: rgba(255,255,255,0.7); }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+
+<script>
+(function () {
+  "use strict";
+
+  // ─────────────────────────────────────────────────────────
+  // ★★★ index.html と同じ設定を使ってください ★★★
+  // ─────────────────────────────────────────────────────────
+  var firebaseConfig = {
+    apiKey: "AIzaSyDLFbNODIc39-B4EZrptkT_TdWu96LUnqw",
+    authDomain: "my-reservation-44373.firebaseapp.com",
+    projectId: "my-reservation-44373",
+    storageBucket: "my-reservation-44373.firebasestorage.app",
+    messagingSenderId: "169192076025",
+    appId: "1:169192076025:web:3b74750eb9986c69fb2828"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  var auth = firebase.auth();
+  var db = firebase.firestore();
+
+  var DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
+
+  function getWeekDates(baseDate) {
+    baseDate = baseDate || new Date();
+    var monday = new Date(baseDate);
+    var day = monday.getDay();
+    var diff = day === 0 ? -6 : 1 - day;
+    monday.setDate(monday.getDate() + diff);
+    var dates = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      dates.push(d);
+    }
+    return dates;
+  }
+
+  function formatDate(date) {
+    return (date.getMonth() + 1) + "/" + date.getDate();
+  }
+
+  function formatDateFull(date) {
+    return date.getFullYear() + "年" + (date.getMonth() + 1) + "月" + date.getDate() + "日（" + DAY_NAMES[date.getDay()] + "）";
+  }
+
+  function dateKey(date) {
+    return date.toISOString().slice(0, 10);
+  }
+
+  var state = {
+    user: null,
+    authChecked: false,
+    loginError: null,
+    loggingIn: false,
+    weekOffset: 0,
+    weekDates: getWeekDates(),
+    bookingsByDay: {}, // dateKey -> [{ time, name, phone }]
+    loadingBookings: false,
+  };
+
+  var root = document.getElementById("app");
+
+  function setState(patch) {
+    Object.assign(state, patch);
+    render();
+  }
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (key) {
+      if (key === "class") node.className = attrs[key];
+      else if (key === "html") node.innerHTML = attrs[key];
+      else if (key.indexOf("on") === 0 && typeof attrs[key] === "function") {
+        node.addEventListener(key.slice(2).toLowerCase(), attrs[key]);
+      } else if (key === "style" && typeof attrs[key] === "object") {
+        Object.assign(node.style, attrs[key]);
+      } else if (key === "disabled") {
+        node.disabled = !!attrs[key];
+      } else {
+        node.setAttribute(key, attrs[key]);
+      }
+    });
+    (children || []).forEach(function (child) {
+      if (child == null) return;
+      if (typeof child === "string") node.appendChild(document.createTextNode(child));
+      else node.appendChild(child);
+    });
+    return node;
+  }
+
+  // ── Auth ──────────────────────────────────────────────────
+  auth.onAuthStateChanged(function (user) {
+    setState({ user: user, authChecked: true });
+    if (user) loadBookingsForWeek();
+  });
+
+  function login(email, password) {
+    setState({ loggingIn: true, loginError: null });
+    auth.signInWithEmailAndPassword(email, password)
+      .catch(function (err) {
+        console.error("Login failed", err);
+        var msg = "ログインに失敗しました。メールアドレスとパスワードをご確認ください。";
+        setState({ loggingIn: false, loginError: msg });
+      });
+  }
+
+  function logout() {
+    auth.signOut();
+  }
+
+  // ── Data loading: only readable while authenticated ───────
+  function loadBookingsForWeek() {
+    setState({ loadingBookings: true });
+    var promises = state.weekDates.map(function (date) {
+      var dk = dateKey(date);
+      return db.collection("slots")
+        .where("date", "==", dk)
+        .where("booked", "==", true)
+        .get()
+        .then(function (snapshot) {
+          var docs = snapshot.docs;
+          return Promise.all(docs.map(function (doc) {
+            return doc.ref.collection("private").doc("info").get().then(function (infoSnap) {
+              var info = infoSnap.exists ? infoSnap.data() : { name: "(情報なし)", phone: "" };
+              return { time: doc.data().time, name: info.name, phone: info.phone };
+            });
+          })).then(function (bookings) {
+            bookings.sort(function (a, b) { return a.time.localeCompare(b.time); });
+            return { dk: dk, bookings: bookings };
+          });
+        });
+    });
+
+    Promise.all(promises).then(function (results) {
+      var byDay = {};
+      results.forEach(function (r) { byDay[r.dk] = r.bookings; });
+      setState({ bookingsByDay: byDay, loadingBookings: false });
+    }).catch(function (err) {
+      console.error("Failed to load bookings", err);
+      setState({ loadingBookings: false });
+    });
+  }
+
+  function changeWeek(delta) {
+    var newOffset = state.weekOffset + delta;
+    var base = new Date();
+    base.setDate(base.getDate() + newOffset * 7);
+    setState({ weekOffset: newOffset, weekDates: getWeekDates(base) });
+    loadBookingsForWeek();
+  }
+
+  function goToday() {
+    setState({ weekOffset: 0, weekDates: getWeekDates() });
+    loadBookingsForWeek();
+  }
+
+  // ── Render: Login screen ───────────────────────────────────
+  function renderLogin() {
+    var emailInput = el("input", { type: "email", placeholder: "owner@example.com" });
+    var passwordInput = el("input", { type: "password", placeholder: "••••••••" });
+
+    function doLogin() {
+      if (!emailInput.value.trim() || !passwordInput.value) return;
+      login(emailInput.value.trim(), passwordInput.value);
+    }
+
+    passwordInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") doLogin();
+    });
+
+    var children = [
+      el("h1", {}, ["🔒 オーナー管理画面"]),
+      el("p", { class: "sub" }, ["予約者の氏名・連絡先を確認できます"]),
+    ];
+
+    if (state.loginError) {
+      children.push(el("div", { class: "login-error" }, [state.loginError]));
+    }
+
+    children.push(
+      el("div", { class: "field" }, [
+        el("label", {}, ["メールアドレス"]),
+        emailInput,
+      ]),
+      el("div", { class: "field" }, [
+        el("label", {}, ["パスワード"]),
+        passwordInput,
+      ]),
+      el(
+        "button",
+        {
+          class: "login-btn" + (state.loggingIn ? " loading" : ""),
+          disabled: state.loggingIn,
+          onClick: doLogin,
+        },
+        [state.loggingIn ? "ログイン中..." : "ログイン"]
+      ),
+      el("a", { class: "back-link", href: "index.html" }, ["← 予約ページに戻る"])
+    );
+
+    return el("div", { class: "center-screen" }, [
+      el("div", { class: "login-box" }, children),
+    ]);
+  }
+
+  // ── Render: Dashboard ───────────────────────────────────────
+  function renderHeader() {
+    return el("div", { class: "header" }, [
+      el("div", {}, [
+        el("h1", {}, ["🔒 予約管理"]),
+        el("p", {}, [state.user.email + " でログイン中"]),
+      ]),
+      el("button", { class: "logout-btn", onClick: logout }, ["ログアウト"]),
+    ]);
+  }
+
+  function renderNav() {
+    var children = [
+      el("button", { class: "nav-btn", onClick: function () { changeWeek(-1); } }, ["← 前週"]),
+      el("span", { class: "nav-label" }, [
+        formatDate(state.weekDates[0]) + " 〜 " + formatDate(state.weekDates[6]),
+      ]),
+      el("button", { class: "nav-btn", onClick: function () { changeWeek(1); } }, ["次週 →"]),
+    ];
+    if (state.weekOffset !== 0) {
+      children.push(el("button", { class: "nav-btn", onClick: goToday }, ["今週"]));
+    }
+    return el("div", { class: "nav-row" }, children);
+  }
+
+  function renderDayGroup(date) {
+    var dk = dateKey(date);
+    var bookings = state.bookingsByDay[dk] || [];
+
+    var rows;
+    if (bookings.length === 0) {
+      rows = [el("div", { class: "empty-day" }, ["予約はありません"])];
+    } else {
+      rows = bookings.map(function (b) {
+        return el("div", { class: "booking-row" }, [
+          el("span", { class: "time" }, [b.time]),
+          el("span", { class: "name" }, [b.name + " 様"]),
+          el("span", { class: "phone" }, [b.phone]),
+        ]);
+      });
+    }
+
+    return el("div", { class: "day-group" }, [
+      el("div", { class: "day-group-header" }, [
+        el("span", {}, [formatDateFull(date)]),
+        el("span", { class: "count" }, [bookings.length + " 件"]),
+      ]),
+    ].concat(rows));
+  }
+
+  function renderDashboard() {
+    var content;
+    if (state.loadingBookings) {
+      content = el("div", { class: "loading-msg" }, ["読み込み中..."]);
+    } else {
+      content = el("div", {}, state.weekDates.map(renderDayGroup));
+    }
+
+    return el("div", {}, [
+      renderHeader(),
+      el("div", { class: "content" }, [renderNav(), content]),
+    ]);
+  }
+
+  function render() {
+    root.innerHTML = "";
+
+    if (!state.authChecked) {
+      root.appendChild(el("div", { class: "loading-msg" }, ["確認中..."]));
+      return;
+    }
+
+    if (!state.user) {
+      root.appendChild(renderLogin());
+      return;
+    }
+
+    root.appendChild(renderDashboard());
+  }
+
+  render();
+})();
+</script>
+
+</body>
+</html>

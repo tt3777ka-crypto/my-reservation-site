@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>健康維持整体 予約受付</title>
+<meta property="og:title" content="健康維持整体 予約受付">
+<meta property="og:description" content="大門区民館｜〇×で簡単予約！希望の時間帯を選んでください。">
+<meta property="og:type" content="website">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:-apple-system,'Hiragino Sans','Noto Sans JP',sans-serif;background:linear-gradient(160deg,#e8faf0 0%,#f0fff6 100%);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 16px 48px}
+.card{background:white;border-radius:24px;box-shadow:0 8px 40px rgba(6,199,85,.13),0 2px 8px rgba(0,0,0,.06);max-width:400px;width:100%;overflow:hidden}
+.card-header{background:linear-gradient(135deg,#06C755 0%,#04a846 100%);padding:32px 24px 28px;text-align:center}
+.line-logo{width:58px;height:58px;background:white;border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;box-shadow:0 4px 14px rgba(0,0,0,.15)}
+.line-logo svg{width:40px;height:40px}
+.card-header h1{font-size:22px;font-weight:700;color:white;margin-bottom:4px}
+.card-header p{font-size:13px;color:rgba(255,255,255,.85)}
+.card-body{padding:20px 24px 8px}
+.ev-row{display:flex;align-items:center;gap:14px;padding:11px 0;border-bottom:1px solid #f2f2f2}
+.ev-row:last-child{border-bottom:none}
+.ev-icon{width:40px;height:40px;border-radius:12px;background:#e8faf0;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.ev-label{font-size:11px;color:#aaa;margin-bottom:2px}
+.ev-value{font-size:14px;font-weight:600;color:#111}
+.notice{margin:14px 24px;background:#f8f8f8;border-radius:12px;padding:12px 14px;font-size:12px;color:#888;line-height:1.75}
+.notice strong{color:#555}
+.btn-area{padding:4px 24px 28px;display:flex;flex-direction:column;gap:10px}
+.btn-main{display:flex;align-items:center;justify-content:center;gap:10px;background:#06C755;color:white;border:none;border-radius:14px;padding:16px;font-size:16px;font-weight:700;cursor:pointer;text-decoration:none;font-family:inherit;transition:all .18s;box-shadow:0 4px 16px rgba(6,199,85,.35)}
+.btn-main:hover{opacity:.88;transform:translateY(-1px)}
+.btn-sub{display:flex;align-items:center;justify-content:center;gap:8px;background:white;color:#06C755;border:2px solid #06C755;border-radius:14px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;font-family:inherit;transition:all .18s}
+.btn-sub:hover{background:#e8faf0}
+.footer{margin-top:24px;font-size:12px;color:#bbb;text-align:center}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+.pulse{animation:pulse 2.6s ease-in-out infinite}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;padding:24px}
+.modal-overlay.open{display:flex}
+.modal{background:white;border-radius:20px;padding:24px;max-width:340px;width:100%;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.2)}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:8px}
+.modal p{font-size:13px;color:#666;margin-bottom:14px;line-height:1.6}
+.url-box{background:#f5f5f5;border-radius:10px;padding:10px 14px;font-size:12px;color:#333;word-break:break-all;margin-bottom:14px;border:1px solid #e0e0e0;text-align:left}
+.copy-btn{background:#06C755;color:white;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;width:100%;margin-bottom:8px}
+.copy-btn:hover{opacity:.88}
+.close-btn{background:none;border:none;color:#aaa;font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px}
+.copied-msg{display:none;color:#06C755;font-size:13px;font-weight:600;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="card-header">
+    <div class="line-logo">
+      <svg viewBox="0 0 24 24" fill="#06C755"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.281.628-.629.628M12 0C5.373 0 0 4.973 0 11.073c0 5.445 4.291 9.978 10.083 10.944.429.082.996.25 1.141.577.13.295.086.754.042 1.051l-.171 1.052c-.047.299-.221 1.175.997.641 1.22-.534 6.571-3.875 8.971-6.631C22.932 16.726 24 14.017 24 11.073 24 4.973 18.627 0 12 0"/></svg>
+    </div>
+    <h1>健康維持整体</h1>
+    <p>大門区民館 ｜ 予約受付フォーム</p>
+  </div>
+  <div class="card-body">
+    <div class="ev-row"><div class="ev-icon">📅</div><div><div class="ev-label">開催日</div><div class="ev-value" id="eventDate">—</div></div></div>
+    <div class="ev-row"><div class="ev-icon">📍</div><div><div class="ev-label">場所</div><div class="ev-value">大門区民館</div></div></div>
+    <div class="ev-row"><div class="ev-icon">💆</div><div><div class="ev-label">内容</div><div class="ev-value">健康維持整体</div></div></div>
+    <div class="ev-row"><div class="ev-icon">✅</div><div><div class="ev-label">予約方法</div><div class="ev-value">〇×で希望時間を選ぶだけ！</div></div></div>
+  </div>
+  <div class="notice">
+    <strong>📌 ご注意</strong><br>
+    ・満員の時間帯は自動的に×になります<br>
+    ・参加者名は他の方には表示されません<br>
+    ・空き状況はリアルタイムで更新されます
+  </div>
+  <div class="btn-area">
+    <a href="./reservation.html" class="btn-main pulse">📋 予約フォームを開く</a>
+    <button class="btn-sub" onclick="openShare()">🔗 このURLをLINEで共有</button>
+  </div>
+</div>
+<div class="footer">© 大門区民館 健康維持整体 予約システム</div>
+
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+  <div class="modal">
+    <h3>🔗 URLをLINEで共有</h3>
+    <p>このURLをコピーして<br>LINEのトークに貼り付けてください</p>
+    <div class="url-box" id="shareUrl"></div>
+    <button class="copy-btn" onclick="copyUrl()">URLをコピーする</button>
+    <div class="copied-msg" id="copiedMsg">✅ コピーしました！</div>
+    <button class="close-btn" onclick="document.getElementById('modal').classList.remove('open')">閉じる</button>
+  </div>
+</div>
+<script>
+const WD=['日','月','火','水','木','金','土'];
+const MO=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+function nextSat(){const d=new Date();const dd=d.getDay();d.setDate(d.getDate()+(dd===6?7:6-dd));return d;}
+const ns=nextSat();
+document.getElementById('eventDate').textContent=`${ns.getFullYear()}年${MO[ns.getMonth()]}${ns.getDate()}日（${WD[ns.getDay()]}）`;
+function openShare(){document.getElementById('shareUrl').textContent=location.href;document.getElementById('modal').classList.add('open');document.getElementById('copiedMsg').style.display='none';}
+function closeModal(e){if(e.target===document.getElementById('modal'))document.getElementById('modal').classList.remove('open');}
+async function copyUrl(){try{await navigator.clipboard.writeText(location.href);}catch(e){const r=document.createRange();r.selectNode(document.getElementById('shareUrl'));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand('copy');}document.getElementById('copiedMsg').style.display='block';}
+</script>
+</body>
+</html>
