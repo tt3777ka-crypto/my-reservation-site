@@ -325,6 +325,7 @@
   function dateKey(date) {
     return date.toISOString().slice(0, 10);
   }
+
   var state = {
     user: null,
     authChecked: false,
@@ -332,7 +333,7 @@
     loggingIn: false,
     weekOffset: 0,
     weekDates: getWeekDates(),
-    bookingsByDay: {}, // dateKey -> [{ slotId, time, name, phone }]
+    bookingsByDay: {}, // dateKey -> [{ time, name, phone }]
     loadingBookings: false,
   };
 
@@ -420,13 +421,39 @@
     });
   }
 
+  var NOTIFY_URL = "https://script.google.com/macros/s/AKfycbyrYcdIbQ19gP0bUJqRT6Vxqk66RfAebU1WchqIj93zjEnX4BjWlvSXPvh2t18vq9-0/exec";
+
+  function notifyCalendarOnly(dateStr, time) {
+    try {
+      fetch(NOTIFY_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: "cancel",
+          name: "",
+          phone: "",
+          date: dateStr,
+          time: time,
+        }),
+      }).catch(function (err) {
+        console.warn("Calendar sync notification failed", err);
+      });
+    } catch (err) {
+      console.warn("Calendar sync notification failed", err);
+    }
+  }
+
   function cancelBooking(slotId, name, time) {
     var ok = window.confirm(time + " の予約（" + name + " 様）を取り消しますか？");
     if (!ok) return;
 
+    var dateStr = slotId.split("_")[0];
+
     db.collection("slots").doc(slotId).update({ booked: false })
       .then(function () {
         loadBookingsForWeek();
+        notifyCalendarOnly(dateStr, time);
       })
       .catch(function (err) {
         console.error("Owner cancel failed", err);
@@ -495,6 +522,7 @@
       el("div", { class: "login-box" }, children),
     ]);
   }
+
   // ── Render: Dashboard ───────────────────────────────────────
   function renderHeader() {
     return el("div", { class: "header" }, [

@@ -496,6 +496,7 @@
   ];
 
   var DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
+
   // ── Date helpers ──────────────────────────────────────────
   function getWeekDates(baseDate) {
     baseDate = baseDate || new Date();
@@ -628,6 +629,32 @@
     }, 3500);
   }
 
+  // ── Notify owner via Google Apps Script (email + calendar) ─
+  // Apps Script web app doesn't reliably send CORS headers, so we fire-and-forget
+  // and ignore the response. Failures here must never block the booking/cancel flow.
+  var NOTIFY_URL = "https://script.google.com/macros/s/AKfycbyrYcdIbQ19gP0bUJqRT6Vxqk66RfAebU1WchqIj93zjEnX4BjWlvSXPvh2t18vq9-0/exec";
+
+  function notifyOwner(action, name, phone, dateStr, time) {
+    try {
+      fetch(NOTIFY_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: action,
+          name: name,
+          phone: phone,
+          date: dateStr,
+          time: time,
+        }),
+      }).catch(function (err) {
+        console.warn("Owner notification failed (booking itself still succeeded)", err);
+      });
+    } catch (err) {
+      console.warn("Owner notification failed (booking itself still succeeded)", err);
+    }
+  }
+
   function confirmBooking(name, phone) {
     var errors = {};
     if (!name.trim()) errors.name = "お名前を入力してください";
@@ -669,6 +696,7 @@
       });
     }).then(function () {
       setState({ saving: false, modalErrors: {}, modalMode: "code", issuedCode: code });
+      notifyOwner("book", name.trim(), phone.trim(), dateKey(modal.date), modal.time);
     }).catch(function (err) {
       console.error("Booking failed", err);
       setState({ saving: false });
@@ -703,6 +731,7 @@
     }).then(function () {
       setState({ modal: null, saving: false, modalErrors: {} });
       showToast("予約を取り消しました", false);
+      notifyOwner("cancel", "", "", dateKey(modal.date), modal.time);
     }).catch(function (err) {
       console.error("Cancel failed", err);
       setState({ saving: false, modalErrors: { code: "コードが一致しません。もう一度ご確認ください。" } });
@@ -786,6 +815,7 @@
     });
     return el("div", { class: "day-header-row" }, cells);
   }
+
   function renderTimeRow(time, today) {
     var cells = [el("div", { class: "time-label" }, [time])];
 
