@@ -412,9 +412,6 @@
 (function () {
   "use strict";
 
-  // ─────────────────────────────────────────────────────────
-  // ★★★ ここをあなたのFirebase設定に書き換えてください ★★★
-  // ─────────────────────────────────────────────────────────
   var firebaseConfig = {
     apiKey: "AIzaSyDLFbNODIc39-B4EZrptkT_TdWu96LUnqw",
     authDomain: "my-reservation-44373.firebaseapp.com",
@@ -436,7 +433,6 @@
 
   var DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
 
-  // ── Date helpers ──────────────────────────────────────────
   function getWeekDates(baseDate) {
     baseDate = baseDate || new Date();
     var monday = new Date(baseDate);
@@ -468,15 +464,14 @@
     return dateKey(date) + "_" + time;
   }
 
-  // ── State ──────────────────────────────────────────────────
   var state = {
     weekOffset: 0,
     weekDates: getWeekDates(),
-    bookedSlots: {},     // slotId -> true  (public status only, no personal info)
+    bookedSlots: {},
     loading: true,
     online: false,
     connectionError: null,
-    modal: null,         // { date, time }
+    modal: null,
     saving: false,
     toast: null,
     toastError: false,
@@ -491,8 +486,6 @@
     render();
   }
 
-  // ── Firestore: realtime listener on public status only ────
-  // Collection "slots": each doc { booked: true } — no name/phone here.
   function attachListener() {
     if (unsubscribe) unsubscribe();
     unsubscribe = db.collection("slots")
@@ -512,7 +505,6 @@
       );
   }
 
-  // ── Derived data ──────────────────────────────────────────
   function isBooked(date, time) {
     return !!state.bookedSlots[slotId(date, time)];
   }
@@ -528,7 +520,6 @@
     return { total: totalSlots, booked: bookedCount, available: totalSlots - bookedCount };
   }
 
-  // ── Actions ──────────────────────────────────────────────
   function changeWeek(delta) {
     var newOffset = state.weekOffset + delta;
     var base = new Date();
@@ -574,8 +565,6 @@
     var slotRef = db.collection("slots").doc(id);
     var privateRef = slotRef.collection("private").doc("info");
 
-    // Use a transaction so two people clicking the same slot at once
-    // can't both succeed (whoever commits first wins; the loser sees an error).
     db.runTransaction(function (tx) {
       return tx.get(slotRef).then(function (docSnap) {
         if (docSnap.exists && docSnap.data().booked) {
@@ -608,7 +597,6 @@
     });
   }
 
-  // ── Rendering ──────────────────────────────────────────────
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     attrs = attrs || {};
