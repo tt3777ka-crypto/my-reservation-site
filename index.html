@@ -179,7 +179,7 @@
   .slot-btn.booked {
     background: rgba(239,68,68,0.2);
     box-shadow: inset 0 0 0 1px rgba(239,68,68,0.4);
-    cursor: default;
+    cursor: pointer;
     color: var(--red);
     text-shadow: 0 0 8px rgba(239,68,68,0.5);
   }
@@ -370,6 +370,11 @@
     box-shadow: none;
   }
 
+  .btn-confirm.danger {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    box-shadow: 0 4px 15px rgba(220,38,38,0.4);
+  }
+
   .modal-error-banner {
     background: rgba(239,68,68,0.15);
     border: 1px solid rgba(239,68,68,0.4);
@@ -378,6 +383,36 @@
     font-size: 12px;
     color: #fca5a5;
     margin-bottom: 16px;
+  }
+
+  .code-display {
+    background: rgba(52,211,153,0.12);
+    border: 1px solid rgba(52,211,153,0.4);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .code-display .label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 6px;
+  }
+
+  .code-display .code {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    color: var(--green);
+    font-family: 'Courier New', monospace;
+  }
+
+  .code-display .hint {
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    margin-top: 8px;
+    line-height: 1.5;
   }
 
   .toast {
@@ -394,9 +429,35 @@
     box-shadow: 0 8px 30px rgba(0,0,0,0.4);
     z-index: 2000;
     white-space: nowrap;
+    max-width: 90vw;
   }
   .toast.error {
     background: linear-gradient(135deg, #dc2626, #b91c1c);
+  }
+
+  .tab-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 9px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .tab-btn.active {
+    background: rgba(167,139,250,0.15);
+    border-color: rgba(167,139,250,0.4);
+    color: #c4b5fd;
   }
 </style>
 </head>
@@ -412,6 +473,9 @@
 (function () {
   "use strict";
 
+  // ─────────────────────────────────────────────────────────
+  // ★★★ ここをあなたのFirebase設定に書き換えてください ★★★
+  // ─────────────────────────────────────────────────────────
   var firebaseConfig = {
     apiKey: "AIzaSyDLFbNODIc39-B4EZrptkT_TdWu96LUnqw",
     authDomain: "my-reservation-44373.firebaseapp.com",
@@ -432,7 +496,7 @@
   ];
 
   var DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
-
+  // ── Date helpers ──────────────────────────────────────────
   function getWeekDates(baseDate) {
     baseDate = baseDate || new Date();
     var monday = new Date(baseDate);
@@ -464,14 +528,22 @@
     return dateKey(date) + "_" + time;
   }
 
+  function generateCancelCode() {
+    var n = Math.floor(100000 + Math.random() * 900000);
+    return String(n);
+  }
+
+  // ── State ──────────────────────────────────────────────────
   var state = {
     weekOffset: 0,
     weekDates: getWeekDates(),
-    bookedSlots: {},
+    bookedSlots: {},     // slotId -> true  (public status only, no personal info)
     loading: true,
     online: false,
     connectionError: null,
-    modal: null,
+    modal: null,         // { date, time }
+    modalMode: "book",   // "book" | "cancel" | "code"
+    issuedCode: null,    // code shown right after a successful booking
     saving: false,
     toast: null,
     toastError: false,
@@ -486,6 +558,8 @@
     render();
   }
 
+  // ── Firestore: realtime listener on public status only ────
+  // Collection "slots": each doc { booked: true } — no name/phone here.
   function attachListener() {
     if (unsubscribe) unsubscribe();
     unsubscribe = db.collection("slots")
@@ -505,6 +579,7 @@
       );
   }
 
+  // ── Derived data ──────────────────────────────────────────
   function isBooked(date, time) {
     return !!state.bookedSlots[slotId(date, time)];
   }
@@ -520,6 +595,7 @@
     return { total: totalSlots, booked: bookedCount, available: totalSlots - bookedCount };
   }
 
+  // ── Actions ──────────────────────────────────────────────
   function changeWeek(delta) {
     var newOffset = state.weekOffset + delta;
     var base = new Date();
@@ -532,12 +608,17 @@
   }
 
   function openModal(date, time) {
-    setState({ modal: { date: date, time: time }, modalErrors: {} });
+    var booked = isBooked(date, time);
+    setState({
+      modal: { date: date, time: time },
+      modalMode: booked ? "cancel" : "book",
+      modalErrors: {},
+    });
   }
 
   function closeModal() {
     if (state.saving) return;
-    setState({ modal: null, modalErrors: {} });
+    setState({ modal: null, modalMode: "book", modalErrors: {}, issuedCode: null });
   }
 
   function showToast(message, isError) {
@@ -564,7 +645,10 @@
     var id = slotId(modal.date, modal.time);
     var slotRef = db.collection("slots").doc(id);
     var privateRef = slotRef.collection("private").doc("info");
+    var code = generateCancelCode();
 
+    // Use a transaction so two people clicking the same slot at once
+    // can't both succeed (whoever commits first wins; the loser sees an error).
     db.runTransaction(function (tx) {
       return tx.get(slotRef).then(function (docSnap) {
         if (docSnap.exists && docSnap.data().booked) {
@@ -575,6 +659,7 @@
           date: dateKey(modal.date),
           time: modal.time,
           bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          cancelCode: code,
         });
         tx.set(privateRef, {
           name: name.trim(),
@@ -583,8 +668,7 @@
         });
       });
     }).then(function () {
-      setState({ modal: null, saving: false, modalErrors: {} });
-      showToast(name.trim() + " 様の予約が完了しました", false);
+      setState({ saving: false, modalErrors: {}, modalMode: "code", issuedCode: code });
     }).catch(function (err) {
       console.error("Booking failed", err);
       setState({ saving: false });
@@ -597,6 +681,35 @@
     });
   }
 
+  function confirmCancel(inputCode) {
+    var errors = {};
+    if (!inputCode.trim()) errors.code = "キャンセルコードを入力してください";
+    else if (!/^\d{6}$/.test(inputCode.trim())) errors.code = "6桁の数字を入力してください";
+
+    if (Object.keys(errors).length > 0) {
+      setState({ modalErrors: errors });
+      return;
+    }
+
+    setState({ saving: true });
+
+    var modal = state.modal;
+    var id = slotId(modal.date, modal.time);
+    var slotRef = db.collection("slots").doc(id);
+
+    slotRef.update({
+      booked: false,
+      cancelCode: inputCode.trim(),
+    }).then(function () {
+      setState({ modal: null, saving: false, modalErrors: {} });
+      showToast("予約を取り消しました", false);
+    }).catch(function (err) {
+      console.error("Cancel failed", err);
+      setState({ saving: false, modalErrors: { code: "コードが一致しません。もう一度ご確認ください。" } });
+    });
+  }
+
+  // ── Rendering ──────────────────────────────────────────────
   function el(tag, attrs, children) {
     var node = document.createElement(tag);
     attrs = attrs || {};
@@ -673,14 +786,15 @@
     });
     return el("div", { class: "day-header-row" }, cells);
   }
-
   function renderTimeRow(time, today) {
     var cells = [el("div", { class: "time-label" }, [time])];
 
     state.weekDates.forEach(function (date) {
       var booked = isBooked(date, time);
       var isPast = date < today;
-      var disabled = isPast || booked || !state.online;
+      // Past+available slots are not clickable. Past+booked slots also
+      // can't be cancelled (no point cancelling something already over).
+      var disabled = isPast || !state.online;
 
       var btnClass = "slot-btn " + (booked ? "booked" : "available") + (isPast ? " past" : "");
       var btn = el(
@@ -688,7 +802,7 @@
         {
           class: btnClass,
           disabled: disabled,
-          title: booked ? "予約済み" : isPast ? "" : "クリックして予約",
+          title: booked ? "予約済み（クリックでキャンセル）" : isPast ? "" : "クリックして予約",
           onClick: function () {
             if (disabled) return;
             openModal(date, time);
@@ -720,7 +834,7 @@
   function renderLegend() {
     return el("div", { class: "legend" }, [
       el("span", { style: { color: "#34d399" } }, ["○ 空き（クリックで予約）"]),
-      el("span", { style: { color: "#f87171" } }, ["✗ 予約済み"]),
+      el("span", { style: { color: "#f87171" } }, ["✗ 予約済み（クリックでキャンセル）"]),
     ]);
   }
 
@@ -731,9 +845,8 @@
     ]);
   }
 
-  function renderModal() {
-    if (!state.modal) return null;
-    var slot = state.modal;
+  // ── Modal: booking form ────────────────────────────────────
+  function renderBookForm(slot) {
     var errors = state.modalErrors;
 
     var nameInput = el("input", {
@@ -768,7 +881,7 @@
     var cancelBtn = el(
       "button",
       { class: "btn-cancel", disabled: state.saving, onClick: closeModal },
-      ["キャンセル"]
+      ["やめる"]
     );
 
     var nameField = el("div", { class: "field" }, [
@@ -783,7 +896,9 @@
       errors.phone ? el("div", { class: "error-msg" }, [errors.phone]) : null,
     ]);
 
-    var boxChildren = [
+    setTimeout(function () { nameInput.focus(); }, 0);
+
+    return [
       el("div", { style: { marginBottom: "20px" } }, [
         el("div", { class: "modal-eyebrow" }, ["予約フォーム"]),
         el("div", { class: "modal-date" }, [formatDateFull(slot.date)]),
@@ -793,6 +908,104 @@
       phoneField,
       el("div", { class: "modal-buttons" }, [cancelBtn, confirmBtn]),
     ];
+  }
+
+  // ── Modal: code issued right after booking ─────────────────
+  function renderCodeIssued(slot) {
+    var closeBtn = el(
+      "button",
+      { class: "btn-confirm", onClick: closeModal, style: { flex: "1" } },
+      ["閉じる"]
+    );
+
+    return [
+      el("div", { style: { marginBottom: "16px" } }, [
+        el("div", { class: "modal-eyebrow" }, ["予約完了"]),
+        el("div", { class: "modal-date" }, [formatDateFull(slot.date)]),
+        el("div", { class: "modal-time-pill" }, ["🕐 " + slot.time]),
+      ]),
+      el("div", { class: "code-display" }, [
+        el("div", { class: "label" }, ["キャンセルコード"]),
+        el("div", { class: "code" }, [state.issuedCode]),
+        el("div", { class: "hint" }, [
+          "このコードは予約を取り消すときに必要です。スクリーンショットを撮るか、メモしておいてください。",
+        ]),
+      ]),
+      el("div", { class: "modal-buttons" }, [closeBtn]),
+    ];
+  }
+
+  // ── Modal: cancel form (enter code) ─────────────────────────
+  function renderCancelForm(slot) {
+    var errors = state.modalErrors;
+
+    var codeInput = el("input", {
+      type: "text",
+      inputmode: "numeric",
+      placeholder: "123456",
+      maxlength: "6",
+      class: errors.code ? "error" : "",
+      style: { textAlign: "center", fontSize: "20px", letterSpacing: "4px", fontFamily: "'Courier New', monospace" },
+    });
+
+    codeInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") doSubmit();
+    });
+
+    function doSubmit() {
+      confirmCancel(codeInput.value);
+    }
+
+    var confirmBtn = el(
+      "button",
+      {
+        class: "btn-confirm danger" + (state.saving ? " saving" : ""),
+        disabled: state.saving,
+        onClick: doSubmit,
+      },
+      [state.saving ? "確認中..." : "予約を取り消す"]
+    );
+
+    var cancelBtn = el(
+      "button",
+      { class: "btn-cancel", disabled: state.saving, onClick: closeModal },
+      ["戻る"]
+    );
+
+    var codeField = el("div", { class: "field phone" }, [
+      el("label", {}, ["キャンセルコード（6桁） ", el("span", { class: "req" }, ["*"])]),
+      codeInput,
+      errors.code ? el("div", { class: "error-msg" }, [errors.code]) : null,
+    ]);
+
+    setTimeout(function () { codeInput.focus(); }, 0);
+
+    return [
+      el("div", { style: { marginBottom: "20px" } }, [
+        el("div", { class: "modal-eyebrow" }, ["予約のキャンセル"]),
+        el("div", { class: "modal-date" }, [formatDateFull(slot.date)]),
+        el("div", { class: "modal-time-pill" }, ["🕐 " + slot.time]),
+      ]),
+      el("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.5)", marginBottom: "16px", lineHeight: "1.6" } }, [
+        "予約時に表示された6桁のキャンセルコードを入力してください。",
+      ]),
+      codeField,
+      el("div", { class: "modal-buttons" }, [cancelBtn, confirmBtn]),
+    ];
+  }
+
+  function renderModal() {
+    if (!state.modal) return null;
+    var slot = state.modal;
+
+    var boxChildren;
+    if (state.modalMode === "code") {
+      boxChildren = renderCodeIssued(slot);
+    } else if (state.modalMode === "cancel") {
+      boxChildren = renderCancelForm(slot);
+    } else {
+      boxChildren = renderBookForm(slot);
+    }
 
     var box = el("div", { class: "modal-box" }, boxChildren);
 
@@ -806,8 +1019,6 @@
       },
       [box]
     );
-
-    setTimeout(function () { nameInput.focus(); }, 0);
 
     return overlay;
   }
