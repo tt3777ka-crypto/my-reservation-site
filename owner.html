@@ -267,6 +267,144 @@
     text-decoration: none;
   }
   .back-link:hover { color: rgba(255,255,255,0.7); }
+
+  /* ── Calendar grid (mirrors index.html) ── */
+  .grid-section { margin-bottom: 32px; }
+
+  .grid-section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.7);
+    margin-bottom: 10px;
+  }
+
+  .grid-scroll { overflow-x: auto; }
+  .grid-inner { min-width: 700px; background: rgba(255,255,255,0.06); padding: 4px; border-radius: 14px; }
+
+  .day-header-row, .time-row {
+    display: grid;
+    grid-template-columns: 64px repeat(7, 1fr);
+    gap: 4px;
+  }
+
+  .day-header-group { margin-bottom: 4px; }
+  .dow-row { margin-bottom: 3px; }
+
+  .time-row { margin-bottom: 4px; }
+  .time-row:last-child { margin-bottom: 0; }
+
+  .day-cell {
+    text-align: center;
+    padding: 6px 4px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.08);
+  }
+
+  .day-cell .dow {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    color: rgba(255,255,255,0.6);
+  }
+  .day-cell .dow.sun { color: var(--red); }
+  .day-cell .dow.sat { color: #60a5fa; }
+
+  .day-cell .date {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .time-label {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+    font-weight: 700;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+  }
+
+  .cell-wrap { position: relative; padding: 6px 4px; background: rgba(255,255,255,0.08); border-radius: 10px; }
+
+  .slot-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 800;
+    margin: 0 auto;
+  }
+  .slot-btn.available { color: var(--green); }
+  .slot-btn.booked { color: var(--red); }
+  .slot-btn.blocked-slot { color: rgba(255,255,255,0.35); }
+  .slot-btn.past { opacity: 0.3; cursor: default; }
+  .slot-btn[disabled] { cursor: not-allowed; opacity: 0.5; }
+
+  .slot-action-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .slot-action-box {
+    background: linear-gradient(145deg, #1e1b4b, #1e293b);
+    border: 1px solid rgba(167,139,250,0.3);
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 380px;
+  }
+
+  .slot-action-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .slot-action-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 18px;
+  }
+
+  .slot-action-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 10px;
+    text-align: left;
+  }
+  .slot-action-btn .desc {
+    display: block;
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .slot-action-btn.danger { border-color: rgba(239,68,68,0.4); color: #fca5a5; }
+  .slot-action-btn.cancel-link { background: transparent; text-align: center; border: none; color: rgba(255,255,255,0.5); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -299,6 +437,13 @@
 
   var DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
 
+  var TIME_SLOTS = [
+    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+    "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+    "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+    "18:00", "18:30",
+  ];
+
   function getWeekDates(baseDate) {
     baseDate = baseDate || new Date();
     var monday = new Date(baseDate);
@@ -326,6 +471,15 @@
     return date.toISOString().slice(0, 10);
   }
 
+  function slotId(date, time) {
+    return dateKey(date) + "_" + time;
+  }
+
+  function generateCancelCode() {
+    var n = Math.floor(100000 + Math.random() * 900000);
+    return String(n);
+  }
+
   var state = {
     user: null,
     authChecked: false,
@@ -335,6 +489,17 @@
     weekDates: getWeekDates(),
     bookingsByDay: {}, // dateKey -> [{ time, name, phone }]
     loadingBookings: false,
+
+    // slotId -> "booked" | "blocked" | undefined(available), for the grid view
+    slotStatus: {},
+    loadingGrid: false,
+
+    // Modal for clicking a grid cell
+    slotModal: null,      // { date, time, status }
+    slotModalMode: "menu", // "menu" | "phone-book" | "blocked-detail" | "booked-detail"
+    slotModalErrors: {},
+    slotModalSaving: false,
+    slotModalDetail: null, // { name, phone } loaded for booked-detail
   };
 
   var root = document.getElementById("app");
@@ -371,7 +536,10 @@
   // ── Auth ──────────────────────────────────────────────────
   auth.onAuthStateChanged(function (user) {
     setState({ user: user, authChecked: true });
-    if (user) loadBookingsForWeek();
+    if (user) {
+      loadBookingsForWeek();
+      loadGridForWeek();
+    }
   });
 
   function login(email, password) {
@@ -421,6 +589,35 @@
     });
   }
 
+  // ── Grid view: load booked + blocked status for the week (no personal info needed here) ──
+  function loadGridForWeek() {
+    setState({ loadingGrid: true });
+    var promises = state.weekDates.map(function (date) {
+      var dk = dateKey(date);
+      return db.collection("slots")
+        .where("date", "==", dk)
+        .get()
+        .then(function (snapshot) {
+          var statuses = {};
+          snapshot.forEach(function (doc) {
+            var data = doc.data();
+            if (data.booked) statuses[doc.id] = "booked";
+            else if (data.blocked) statuses[doc.id] = "blocked";
+          });
+          return statuses;
+        });
+    });
+
+    Promise.all(promises).then(function (results) {
+      var merged = {};
+      results.forEach(function (r) { Object.assign(merged, r); });
+      setState({ slotStatus: merged, loadingGrid: false });
+    }).catch(function (err) {
+      console.error("Failed to load grid", err);
+      setState({ loadingGrid: false });
+    });
+  }
+
   var NOTIFY_URL = "https://script.google.com/macros/s/AKfycbyrYcdIbQ19gP0bUJqRT6Vxqk66RfAebU1WchqIj93zjEnX4BjWlvSXPvh2t18vq9-0/exec";
 
   function notifyCalendarOnly(dateStr, time) {
@@ -461,17 +658,186 @@
       });
   }
 
+  // ── Grid cell click: open the action modal ─────────────────
+  function openSlotModal(date, time) {
+    var id = slotId(date, time);
+    var status = state.slotStatus[id]; // "booked" | "blocked" | undefined
+
+    if (status === "booked") {
+      setState({
+        slotModal: { date: date, time: time, status: status },
+        slotModalMode: "booked-detail",
+        slotModalErrors: {},
+        slotModalDetail: null,
+      });
+      // Load name/phone for display
+      db.collection("slots").doc(id).collection("private").doc("info").get()
+        .then(function (snap) {
+          var info = snap.exists ? snap.data() : { name: "(情報なし)", phone: "" };
+          setState({ slotModalDetail: info });
+        })
+        .catch(function (err) {
+          console.error("Failed to load booking detail", err);
+          setState({ slotModalDetail: { name: "(取得失敗)", phone: "" } });
+        });
+    } else if (status === "blocked") {
+      setState({
+        slotModal: { date: date, time: time, status: status },
+        slotModalMode: "blocked-detail",
+        slotModalErrors: {},
+      });
+    } else {
+      setState({
+        slotModal: { date: date, time: time, status: status },
+        slotModalMode: "menu",
+        slotModalErrors: {},
+      });
+    }
+  }
+
+  function closeSlotModal() {
+    if (state.slotModalSaving) return;
+    setState({ slotModal: null, slotModalMode: "menu", slotModalErrors: {}, slotModalDetail: null });
+  }
+
+  // 休業に設定する（空き枠 → ブロック）
+  function blockSlot() {
+    var modal = state.slotModal;
+    var id = slotId(modal.date, modal.time);
+    setState({ slotModalSaving: true });
+
+    db.collection("slots").doc(id).set({
+      blocked: true,
+      date: dateKey(modal.date),
+      time: modal.time,
+      bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }).then(function () {
+      setState({ slotModalSaving: false });
+      closeSlotModal();
+      loadGridForWeek();
+    }).catch(function (err) {
+      console.error("Failed to block slot", err);
+      setState({ slotModalSaving: false });
+      window.alert("休業設定に失敗しました。もう一度お試しください。");
+    });
+  }
+
+  // 休業を解除する（ブロック → 空き枠）
+  function unblockSlot() {
+    var modal = state.slotModal;
+    var id = slotId(modal.date, modal.time);
+    setState({ slotModalSaving: true });
+
+    db.collection("slots").doc(id).update({ blocked: false }).then(function () {
+      setState({ slotModalSaving: false });
+      closeSlotModal();
+      loadGridForWeek();
+    }).catch(function (err) {
+      console.error("Failed to unblock slot", err);
+      setState({ slotModalSaving: false });
+      window.alert("休業解除に失敗しました。もう一度お試しください。");
+    });
+  }
+
+  // 電話予約の代行入力（空き枠 → 予約済み、名前・電話番号を入力）
+  function openPhoneBookForm() {
+    setState({ slotModalMode: "phone-book", slotModalErrors: {} });
+  }
+
+  function confirmPhoneBooking(name, phone) {
+    var errors = {};
+    if (!name.trim()) errors.name = "お名前を入力してください";
+    if (!phone.trim()) errors.phone = "連絡先番号を入力してください";
+
+    if (Object.keys(errors).length > 0) {
+      setState({ slotModalErrors: errors });
+      return;
+    }
+
+    setState({ slotModalSaving: true });
+
+    var modal = state.slotModal;
+    var id = slotId(modal.date, modal.time);
+    var slotRef = db.collection("slots").doc(id);
+    var privateRef = slotRef.collection("private").doc("info");
+    var code = generateCancelCode();
+
+    db.runTransaction(function (tx) {
+      return tx.get(slotRef).then(function (docSnap) {
+        if (docSnap.exists && (docSnap.data().booked || docSnap.data().blocked)) {
+          throw new Error("ALREADY_TAKEN");
+        }
+        tx.set(slotRef, {
+          booked: true,
+          date: dateKey(modal.date),
+          time: modal.time,
+          bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          cancelCode: code,
+        });
+        tx.set(privateRef, {
+          name: name.trim(),
+          phone: phone.trim(),
+          bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+    }).then(function () {
+      setState({ slotModalSaving: false });
+      closeSlotModal();
+      loadGridForWeek();
+      loadBookingsForWeek();
+    }).catch(function (err) {
+      console.error("Phone booking failed", err);
+      setState({ slotModalSaving: false });
+      if (err.message === "ALREADY_TAKEN") {
+        window.alert("この時間枠はすでに埋まっています。画面を更新してご確認ください。");
+        closeSlotModal();
+        loadGridForWeek();
+      } else {
+        window.alert("登録に失敗しました。もう一度お試しください。");
+      }
+    });
+  }
+
+  // 予約済み枠を、グリッドのモーダルからキャンセルする
+  function cancelBookingFromGrid() {
+    var modal = state.slotModal;
+    var id = slotId(modal.date, modal.time);
+    var detail = state.slotModalDetail || {};
+    var name = detail.name || "";
+
+    var ok = window.confirm(modal.time + " の予約（" + (name || "情報なし") + " 様）を取り消しますか？");
+    if (!ok) return;
+
+    setState({ slotModalSaving: true });
+
+    db.collection("slots").doc(id).update({ booked: false })
+      .then(function () {
+        setState({ slotModalSaving: false });
+        closeSlotModal();
+        loadGridForWeek();
+        loadBookingsForWeek();
+        notifyCalendarOnly(dateKey(modal.date), modal.time);
+      })
+      .catch(function (err) {
+        console.error("Owner cancel from grid failed", err);
+        setState({ slotModalSaving: false });
+        window.alert("キャンセル処理に失敗しました。もう一度お試しください。");
+      });
+  }
+
   function changeWeek(delta) {
     var newOffset = state.weekOffset + delta;
     var base = new Date();
     base.setDate(base.getDate() + newOffset * 7);
     setState({ weekOffset: newOffset, weekDates: getWeekDates(base) });
     loadBookingsForWeek();
+    loadGridForWeek();
   }
 
   function goToday() {
     setState({ weekOffset: 0, weekDates: getWeekDates() });
     loadBookingsForWeek();
+    loadGridForWeek();
   }
 
   // ── Render: Login screen ───────────────────────────────────
@@ -581,6 +947,226 @@
     ].concat(rows));
   }
 
+  // ── Grid: day headers (weekday row + date row) ─────────────
+  function renderGridDayHeaders() {
+    var dowCells = [el("div", {}, [])];
+    var dateCells = [el("div", {}, [])];
+
+    state.weekDates.forEach(function (date) {
+      var isSun = date.getDay() === 0;
+      var isSat = date.getDay() === 6;
+      var dowClass = "dow" + (isSun ? " sun" : isSat ? " sat" : "");
+
+      dowCells.push(
+        el("div", { class: "day-cell" }, [
+          el("div", { class: dowClass }, [DAY_NAMES[date.getDay()]]),
+        ])
+      );
+      dateCells.push(
+        el("div", { class: "day-cell" }, [
+          el("div", { class: "date" }, [formatDate(date)]),
+        ])
+      );
+    });
+
+    return el("div", { class: "day-header-group" }, [
+      el("div", { class: "day-header-row dow-row" }, dowCells),
+      el("div", { class: "day-header-row date-row" }, dateCells),
+    ]);
+  }
+
+  function renderGridTimeRow(time, today) {
+    var cells = [el("div", { class: "time-label" }, [time])];
+
+    state.weekDates.forEach(function (date) {
+      var id = slotId(date, time);
+      var status = state.slotStatus[id]; // "booked" | "blocked" | undefined
+      var isPast = date < today;
+
+      var symbol = status === "booked" ? "✗" : status === "blocked" ? "×" : "○";
+      var btnClass = "slot-btn " + (
+        status === "booked" ? "booked" : status === "blocked" ? "blocked-slot" : "available"
+      ) + (isPast ? " past" : "");
+
+      var btn = el(
+        "button",
+        {
+          class: btnClass,
+          title: status === "booked" ? "予約済み（クリックで詳細）" : status === "blocked" ? "休業中（クリックで解除）" : "クリックで操作",
+          onClick: function () {
+            openSlotModal(date, time);
+          },
+        },
+        [symbol]
+      );
+
+      cells.push(el("div", { class: "cell-wrap" }, [btn]));
+    });
+
+    return el("div", { class: "time-row" }, cells);
+  }
+
+  function renderGrid() {
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    var inner = [renderGridDayHeaders()];
+    TIME_SLOTS.forEach(function (time) {
+      inner.push(renderGridTimeRow(time, today));
+    });
+
+    var content;
+    if (state.loadingGrid) {
+      content = el("div", { class: "loading-msg" }, ["読み込み中..."]);
+    } else {
+      content = el("div", { class: "grid-scroll" }, [
+        el("div", { class: "grid-inner" }, inner),
+      ]);
+    }
+
+    return el("div", { class: "grid-section" }, [
+      el("div", { class: "grid-section-title" }, ["○をクリックして電話予約や休業設定、×をクリックして詳細確認・取り消しができます"]),
+      content,
+    ]);
+  }
+
+  // ── Slot action modal ───────────────────────────────────────
+  function renderSlotMenu(modal) {
+    return [
+      el("div", { class: "slot-action-title" }, [formatDateFull(modal.date) + " " + modal.time]),
+      el("div", { class: "slot-action-sub" }, ["空き枠です。操作を選んでください。"]),
+      el(
+        "button",
+        { class: "slot-action-btn", onClick: openPhoneBookForm },
+        [
+          "電話予約を入れる",
+          el("span", { class: "desc" }, ["お客様の代わりに名前・電話番号を登録します"]),
+        ]
+      ),
+      el(
+        "button",
+        { class: "slot-action-btn danger", onClick: blockSlot },
+        [
+          "休業にする",
+          el("span", { class: "desc" }, ["この時間を予約不可（×）にします"]),
+        ]
+      ),
+      el("button", { class: "slot-action-btn cancel-link", onClick: closeSlotModal }, ["閉じる"]),
+    ];
+  }
+
+  function renderSlotPhoneBookForm(modal) {
+    var errors = state.slotModalErrors;
+
+    var nameInput = el("input", {
+      type: "text",
+      placeholder: "山田 太郎",
+      class: errors.name ? "error" : "",
+    });
+    var phoneInput = el("input", {
+      type: "tel",
+      placeholder: "090-0000-0000",
+      class: errors.phone ? "error" : "",
+    });
+
+    function doSubmit() {
+      confirmPhoneBooking(nameInput.value, phoneInput.value);
+    }
+    phoneInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") doSubmit();
+    });
+
+    setTimeout(function () { nameInput.focus(); }, 0);
+
+    return [
+      el("div", { class: "slot-action-title" }, [formatDateFull(modal.date) + " " + modal.time]),
+      el("div", { class: "slot-action-sub" }, ["電話予約の代行入力"]),
+      el("div", { class: "field" }, [
+        el("label", {}, ["お名前"]),
+        nameInput,
+        errors.name ? el("div", { style: { color: "#fca5a5", fontSize: "11px", marginTop: "4px" } }, [errors.name]) : null,
+      ]),
+      el("div", { class: "field" }, [
+        el("label", {}, ["連絡先番号"]),
+        phoneInput,
+        errors.phone ? el("div", { style: { color: "#fca5a5", fontSize: "11px", marginTop: "4px" } }, [errors.phone]) : null,
+      ]),
+      el(
+        "button",
+        {
+          class: "slot-action-btn",
+          style: { background: "linear-gradient(135deg, #7c3aed, #2563eb)", border: "none", textAlign: "center" },
+          disabled: state.slotModalSaving,
+          onClick: doSubmit,
+        },
+        [state.slotModalSaving ? "登録中..." : "登録する"]
+      ),
+      el("button", { class: "slot-action-btn cancel-link", disabled: state.slotModalSaving, onClick: closeSlotModal }, ["やめる"]),
+    ];
+  }
+
+  function renderSlotBlockedDetail(modal) {
+    return [
+      el("div", { class: "slot-action-title" }, [formatDateFull(modal.date) + " " + modal.time]),
+      el("div", { class: "slot-action-sub" }, ["休業に設定されています。"]),
+      el(
+        "button",
+        { class: "slot-action-btn", disabled: state.slotModalSaving, onClick: unblockSlot },
+        [state.slotModalSaving ? "解除中..." : "休業を解除する"]
+      ),
+      el("button", { class: "slot-action-btn cancel-link", disabled: state.slotModalSaving, onClick: closeSlotModal }, ["閉じる"]),
+    ];
+  }
+
+  function renderSlotBookedDetail(modal) {
+    var detail = state.slotModalDetail;
+    var detailNode = detail
+      ? el("div", { class: "slot-action-sub" }, [
+          (detail.name || "(情報なし)") + " 様 ／ " + (detail.phone || ""),
+        ])
+      : el("div", { class: "slot-action-sub" }, ["読み込み中..."]);
+
+    return [
+      el("div", { class: "slot-action-title" }, [formatDateFull(modal.date) + " " + modal.time]),
+      detailNode,
+      el(
+        "button",
+        { class: "slot-action-btn danger", disabled: state.slotModalSaving || !detail, onClick: cancelBookingFromGrid },
+        [state.slotModalSaving ? "処理中..." : "予約を取り消す"]
+      ),
+      el("button", { class: "slot-action-btn cancel-link", disabled: state.slotModalSaving, onClick: closeSlotModal }, ["閉じる"]),
+    ];
+  }
+
+  function renderSlotModal() {
+    if (!state.slotModal) return null;
+    var modal = state.slotModal;
+
+    var boxChildren;
+    if (state.slotModalMode === "phone-book") {
+      boxChildren = renderSlotPhoneBookForm(modal);
+    } else if (state.slotModalMode === "blocked-detail") {
+      boxChildren = renderSlotBlockedDetail(modal);
+    } else if (state.slotModalMode === "booked-detail") {
+      boxChildren = renderSlotBookedDetail(modal);
+    } else {
+      boxChildren = renderSlotMenu(modal);
+    }
+
+    var box = el("div", { class: "slot-action-box" }, boxChildren);
+
+    return el(
+      "div",
+      {
+        class: "slot-action-modal-overlay",
+        onClick: function (e) {
+          if (e.target === e.currentTarget) closeSlotModal();
+        },
+      },
+      [box]
+    );
+  }
+
   function renderDashboard() {
     var content;
     if (state.loadingBookings) {
@@ -591,7 +1177,8 @@
 
     return el("div", {}, [
       renderHeader(),
-      el("div", { class: "content" }, [renderNav(), content]),
+      el("div", { class: "content" }, [renderNav(), renderGrid(), content]),
+      renderSlotModal(),
     ]);
   }
 
