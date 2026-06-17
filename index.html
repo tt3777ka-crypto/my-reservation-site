@@ -634,7 +634,7 @@
   // and ignore the response. Failures here must never block the booking/cancel flow.
   var NOTIFY_URL = "https://script.google.com/macros/s/AKfycbyrYcdIbQ19gP0bUJqRT6Vxqk66RfAebU1WchqIj93zjEnX4BjWlvSXPvh2t18vq9-0/exec";
 
-  function notifyOwner(action, name, phone, dateStr, time, email) {
+  function notifyOwner(action, name, phone, dateStr, time, email, cancelCode) {
     try {
       fetch(NOTIFY_URL, {
         method: "POST",
@@ -647,6 +647,7 @@
           date: dateStr,
           time: time,
           email: email || "",
+          cancelCode: cancelCode || "",
         }),
       }).catch(function (err) {
         console.warn("Owner notification failed (booking itself still succeeded)", err);
@@ -702,7 +703,7 @@
       });
     }).then(function () {
       setState({ saving: false, modalErrors: {}, modalMode: "code", issuedCode: code });
-      notifyOwner("book", name.trim(), phone.trim(), dateKey(modal.date), modal.time, emailTrimmed);
+      notifyOwner("book", name.trim(), phone.trim(), dateKey(modal.date), modal.time, emailTrimmed, code);
     }).catch(function (err) {
       console.error("Booking failed", err);
       setState({ saving: false });
