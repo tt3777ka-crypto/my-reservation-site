@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>予約スケジュール</title>
+<style>
+  :root {
+    --bg-grad: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    --purple: #a78bfa;
+    --purple-deep: #7c3aed;
+    --blue: #2563eb;
+    --green: #34d399;
+    --red: #f87171;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg-grad);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #fff;
+  }
+
+  button { font-family: inherit; }
+  button:not([disabled]):hover { filter: brightness(1.2); }
+  input::placeholder { color: rgba(255,255,255,0.25); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .cell-wrap:hover .booking-tooltip { opacity: 1 !important; }
+
+  .header {
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .header h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #a78bfa, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .stats { display: flex; gap: 16px; }
+
+  .stat-badge {
+    text-align: center;
+    background: rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 8px 16px;
+  }
+
+  .stat-badge .value { font-size: 20px; font-weight: 700; }
+  .stat-badge .label { font-size: 11px; color: rgba(255,255,255,0.5); }
+
+  .nav-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .nav-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.8);
+    border-radius: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+
+  .nav-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.8);
+    min-width: 180px;
+    text-align: center;
+  }
+
+  .grid-scroll { overflow-x: auto; padding: 0 16px 32px; }
+  .grid-inner { min-width: 700px; }
+
+  .day-header-row, .time-row {
+    display: grid;
+    grid-template-columns: 64px repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  .time-row { margin-bottom: 3px; }
+
+  .day-cell {
+    text-align: center;
+    padding: 8px 4px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid transparent;
+  }
+
+  .day-cell.today {
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    border: 1px solid rgba(167,139,250,0.5);
+  }
+
+  .day-cell .dow {
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    color: rgba(255,255,255,0.6);
+  }
+  .day-cell .dow.sun { color: var(--red); }
+  .day-cell .dow.sat { color: #60a5fa; }
+
+  .day-cell .date {
+    font-size: 14px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.85);
+  }
+  .day-cell.today .date { font-weight: 700; color: #fff; }
+
+  .time-label {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    font-weight: 500;
+  }
+
+  .cell-wrap { position: relative; }
+
+  .slot-btn {
+    width: 100%;
+    height: 36px;
+    border-radius: 6px;
+    border: none;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .slot-btn.available {
+    background: rgba(52,211,153,0.15);
+    box-shadow: inset 0 0 0 1px rgba(52,211,153,0.3);
+    cursor: pointer;
+    color: var(--green);
+    text-shadow: 0 0 8px rgba(52,211,153,0.5);
+  }
+
+  .slot-btn.booked {
+    background: rgba(239,68,68,0.2);
+    box-shadow: inset 0 0 0 1px rgba(239,68,68,0.4);
+    cursor: pointer;
+    color: var(--red);
+    text-shadow: 0 0 8px rgba(239,68,68,0.5);
+  }
+
+  .slot-btn.past { opacity: 0.3; cursor: default; }
+  .slot-btn[disabled] { cursor: not-allowed; opacity: 0.5; }
+
+  .booking-tooltip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15,12,41,0.97);
+    border: 1px solid rgba(239,68,68,0.4);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #fff;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+
+  .legend {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    padding-bottom: 24px;
+    font-size: 13px;
+  }
+
+  .loading-msg, .error-msg-full {
+    text-align: center;
+    padding: 60px;
+    color: rgba(255,255,255,0.5);
+  }
+
+  .pulse-indicator {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+  }
+
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+    animation: pulse 2s infinite;
+  }
+  .pulse-dot.offline { background: var(--red); animation: none; }
+
+  .owner-link {
+    position: fixed;
+    bottom: 16px;
+    left: 16px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
+    text-decoration: none;
+  }
+  .owner-link:hover { color: rgba(255,255,255,0.6); }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .modal-box {
+    background: linear-gradient(145deg, #1e1b4b, #1e293b);
+    border: 1px solid rgba(167,139,250,0.3);
+    border-radius: 16px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 25px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
+  }
+
+  .modal-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--purple);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .modal-date { font-size: 16px; font-weight: 700; color: #fff; }
+
+  .modal-time-pill {
+    display: inline-block;
+    margin-top: 6px;
+    background: rgba(167,139,250,0.15);
+    border: 1px solid rgba(167,139,250,0.3);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 13px;
+    color: #c4b5fd;
+    font-weight: 600;
+  }
+
+  .field { margin-bottom: 16px; }
+  .field.phone { margin-bottom: 24px; }
+
+  .field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 6px;
+  }
+
+  .field label .req { color: var(--red); }
+
+  .field input {
+    width: 100%;
+    box-sizing: border-box;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .field input:focus { border-color: var(--purple); }
+  .field input.error { border-color: var(--red); }
+
+  .field .error-msg {
+    font-size: 11px;
+    color: var(--red);
+    margin-top: 4px;
+  }
+
+  .modal-buttons { display: flex; gap: 10px; }
+
+  .btn-cancel {
+    flex: 1;
+    padding: 11px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: transparent;
+    color: rgba(255,255,255,0.6);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-confirm {
+    flex: 2;
+    padding: 11px;
+    border-radius: 8px;
+    border: none;
+    background: linear-gradient(135deg, #7c3aed, #2563eb);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(124,58,237,0.4);
+    transition: all 0.15s;
+  }
+
+  .btn-confirm.saving {
+    background: rgba(167,139,250,0.4);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .btn-confirm.danger {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    box-shadow: 0 4px 15px rgba(220,38,38,0.4);
+  }
+
+  .modal-error-banner {
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.4);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: #fca5a5;
+    margin-bottom: 16px;
+  }
+
+  .code-display {
+    background: rgba(52,211,153,0.12);
+    border: 1px solid rgba(52,211,153,0.4);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .code-display .label {
+    font-size: 11px;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 6px;
+  }
+
+  .code-display .code {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 4px;
+    color: var(--green);
+    font-family: 'Courier New', monospace;
+  }
+
+  .code-display .hint {
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    margin-top: 8px;
+    line-height: 1.5;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #059669, #0284c7);
+    color: #fff;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    z-index: 2000;
+    white-space: nowrap;
+    max-width: 90vw;
+  }
+  .toast.error {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+  }
+
+  .tab-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .tab-btn {
+    flex: 1;
+    padding: 9px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: transparent;
+    color: rgba(255,255,255,0.5);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .tab-btn.active {
+    background: rgba(167,139,250,0.15);
+    border-color: rgba(167,139,250,0.4);
+    color: #c4b5fd;
+  }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<!-- Firebase SDK (compat build: works directly via <script> tags, no bundler needed) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+
+<script>
+(function () {
+  "use strict";
+
+  // ─────────────────────────────────────────────────────────
+  // ★★★ ここをあなたのFirebase設定に書き換えてください ★★★
+  // ─────────────────────────────────────────────────────────
+  var firebaseConfig = {
+    apiKey: "AIzaSyDLFbNODIc39-B4EZrptkT_TdWu96LUnqw",
+    authDomain: "my-reservation-44373.firebaseapp.com",
+    projectId: "my-reservation-44373",
+    storageBucket: "my-reservation-44373.firebasestorage.app",
+    messagingSenderId: "169192076025",
+    appId: "1:169192076025:web:3b74750eb9986c69fb2828"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.firestore();
+
+  var TIME_SLOTS = [
+    "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
+    "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
+    "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
+    "18:00", "18:30",
+  ];
+
+  var DAY_NAMES = ["日", "月", "火", "水", "木", "金", "土"];
+
+  // ── Date helpers ──────────────────────────────────────────
+  function getWeekDates(baseDate) {
+    baseDate = baseDate || new Date();
+    var monday = new Date(baseDate);
+    var day = monday.getDay();
+    var diff = day === 0 ? -6 : 1 - day;
+    monday.setDate(monday.getDate() + diff);
+    var dates = [];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      dates.push(d);
+    }
+    return dates;
+  }
+
+  function formatDate(date) {
+    return (date.getMonth() + 1) + "/" + date.getDate();
+  }
+
+  function formatDateFull(date) {
+    return date.getFullYear() + "年" + (date.getMonth() + 1) + "月" + date.getDate() + "日（" + DAY_NAMES[date.getDay()] + "）";
+  }
+
+  function dateKey(date) {
+    return date.toISOString().slice(0, 10);
+  }
+
+  function slotId(date, time) {
+    return dateKey(date) + "_" + time;
+  }
+
+  function generateCancelCode() {
+    var n = Math.floor(100000 + Math.random() * 900000);
+    return String(n);
+  }
+
+  // ── State ──────────────────────────────────────────────────
+  var state = {
+    weekOffset: 0,
+    weekDates: getWeekDates(),
+    bookedSlots: {},     // slotId -> true  (public status only, no personal info)
+    loading: true,
+    online: false,
+    connectionError: null,
+    modal: null,         // { date, time }
+    modalMode: "book",   // "book" | "cancel" | "code"
+    issuedCode: null,    // code shown right after a successful booking
+    saving: false,
+    toast: null,
+    toastError: false,
+    modalErrors: {},
+  };
+
+  var root = document.getElementById("app");
+  var unsubscribe = null;
+
+  function setState(patch) {
+    Object.assign(state, patch);
+    render();
+  }
+
+  // ── Firestore: realtime listener on public status only ────
+  // Collection "slots": each doc { booked: true } — no name/phone here.
+  function attachListener() {
+    if (unsubscribe) unsubscribe();
+    unsubscribe = db.collection("slots")
+      .where("booked", "==", true)
+      .onSnapshot(
+        function (snapshot) {
+          var booked = {};
+          snapshot.forEach(function (doc) {
+            booked[doc.id] = true;
+          });
+          setState({ bookedSlots: booked, loading: false, online: true, connectionError: null });
+        },
+        function (err) {
+          console.error("Firestore listener error", err);
+          setState({ loading: false, online: false, connectionError: err.message });
+        }
+      );
+  }
+
+  // ── Derived data ──────────────────────────────────────────
+  function isBooked(date, time) {
+    return !!state.bookedSlots[slotId(date, time)];
+  }
+
+  function computeStats() {
+    var totalSlots = state.weekDates.length * TIME_SLOTS.length;
+    var bookedCount = 0;
+    state.weekDates.forEach(function (date) {
+      TIME_SLOTS.forEach(function (time) {
+        if (isBooked(date, time)) bookedCount++;
+      });
+    });
+    return { total: totalSlots, booked: bookedCount, available: totalSlots - bookedCount };
+  }
+
+  // ── Actions ──────────────────────────────────────────────
+  function changeWeek(delta) {
+    var newOffset = state.weekOffset + delta;
+    var base = new Date();
+    base.setDate(base.getDate() + newOffset * 7);
+    setState({ weekOffset: newOffset, weekDates: getWeekDates(base) });
+  }
+
+  function goToday() {
+    setState({ weekOffset: 0, weekDates: getWeekDates() });
+  }
+
+  function openModal(date, time) {
+    var booked = isBooked(date, time);
+    setState({
+      modal: { date: date, time: time },
+      modalMode: booked ? "cancel" : "book",
+      modalErrors: {},
+    });
+  }
+
+  function closeModal() {
+    if (state.saving) return;
+    setState({ modal: null, modalMode: "book", modalErrors: {}, issuedCode: null });
+  }
+
+  function showToast(message, isError) {
+    setState({ toast: message, toastError: !!isError });
+    setTimeout(function () {
+      setState({ toast: null, toastError: false });
+    }, 3500);
+  }
+
+  // ── Notify owner via Google Apps Script (email + calendar) ─
+  // Apps Script web app doesn't reliably send CORS headers, so we fire-and-forget
+  // and ignore the response. Failures here must never block the booking/cancel flow.
+  var NOTIFY_URL = "https://script.google.com/macros/s/AKfycbyrYcdIbQ19gP0bUJqRT6Vxqk66RfAebU1WchqIj93zjEnX4BjWlvSXPvh2t18vq9-0/exec";
+
+  function notifyOwner(action, name, phone, dateStr, time, email, cancelCode) {
+    try {
+      fetch(NOTIFY_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: action,
+          name: name,
+          phone: phone,
+          date: dateStr,
+          time: time,
+          email: email || "",
+          cancelCode: cancelCode || "",
+        }),
+      }).catch(function (err) {
+        console.warn("Owner notification failed (booking itself still succeeded)", err);
+      });
+    } catch (err) {
+      console.warn("Owner notification failed (booking itself still succeeded)", err);
+    }
+  }
+
+  function confirmBooking(name, phone, email) {
+    var errors = {};
+    if (!name.trim()) errors.name = "お名前を入力してください";
+    if (!phone.trim()) errors.phone = "連絡先番号を入力してください";
+    else if (!/^[\d\-\+\(\)\s]+$/.test(phone)) errors.phone = "正しい電話番号を入力してください";
+    if (email && email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errors.email = "正しいメールアドレスを入力してください";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setState({ modalErrors: errors });
+      return;
+    }
+
+    setState({ saving: true });
+
+    var modal = state.modal;
+    var id = slotId(modal.date, modal.time);
+    var slotRef = db.collection("slots").doc(id);
+    var privateRef = slotRef.collection("private").doc("info");
+    var code = generateCancelCode();
+    var emailTrimmed = (email || "").trim();
+
+    // Use a transaction so two people clicking the same slot at once
+    // can't both succeed (whoever commits first wins; the loser sees an error).
+    db.runTransaction(function (tx) {
+      return tx.get(slotRef).then(function (docSnap) {
+        if (docSnap.exists && docSnap.data().booked) {
+          throw new Error("ALREADY_BOOKED");
+        }
+        tx.set(slotRef, {
+          booked: true,
+          date: dateKey(modal.date),
+          time: modal.time,
+          bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          cancelCode: code,
+        });
+        tx.set(privateRef, {
+          name: name.trim(),
+          phone: phone.trim(),
+          email: emailTrimmed,
+          bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+    }).then(function () {
+      setState({ saving: false, modalErrors: {}, modalMode: "code", issuedCode: code });
+      notifyOwner("book", name.trim(), phone.trim(), dateKey(modal.date), modal.time, emailTrimmed, code);
+    }).catch(function (err) {
+      console.error("Booking failed", err);
+      setState({ saving: false });
+      if (err.message === "ALREADY_BOOKED") {
+        setState({ modal: null });
+        showToast("この時間枠はすでに予約されています。別の時間をお選びください。", true);
+      } else {
+        showToast("予約に失敗しました。通信状態をご確認のうえ再度お試しください。", true);
+      }
+    });
+  }
+
+  function confirmCancel(inputCode) {
+    var errors = {};
+    if (!inputCode.trim()) errors.code = "キャンセルコードを入力してください";
+    else if (!/^\d{6}$/.test(inputCode.trim())) errors.code = "6桁の数字を入力してください";
+
+    if (Object.keys(errors).length > 0) {
+      setState({ modalErrors: errors });
+      return;
+    }
+
+    setState({ saving: true });
+
+    var modal = state.modal;
+    var id = slotId(modal.date, modal.time);
+    var slotRef = db.collection("slots").doc(id);
+
+    slotRef.update({
+      booked: false,
+      cancelCode: inputCode.trim(),
+    }).then(function () {
+      setState({ modal: null, saving: false, modalErrors: {} });
+      showToast("予約を取り消しました", false);
+      notifyOwner("cancel", "", "", dateKey(modal.date), modal.time);
+    }).catch(function (err) {
+      console.error("Cancel failed", err);
+      setState({ saving: false, modalErrors: { code: "コードが一致しません。もう一度ご確認ください。" } });
+    });
+  }
+
+  // ── Rendering ──────────────────────────────────────────────
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (key) {
+      if (key === "class") node.className = attrs[key];
+      else if (key === "html") node.innerHTML = attrs[key];
+      else if (key.indexOf("on") === 0 && typeof attrs[key] === "function") {
+        node.addEventListener(key.slice(2).toLowerCase(), attrs[key]);
+      } else if (key === "style" && typeof attrs[key] === "object") {
+        Object.assign(node.style, attrs[key]);
+      } else if (key === "disabled") {
+        node.disabled = !!attrs[key];
+      } else {
+        node.setAttribute(key, attrs[key]);
+      }
+    });
+    (children || []).forEach(function (child) {
+      if (child == null) return;
+      if (typeof child === "string") node.appendChild(document.createTextNode(child));
+      else node.appendChild(child);
+    });
+    return node;
+  }
+
+  function renderStatBadge(label, value, color) {
+    return el("div", { class: "stat-badge", style: { border: "1px solid " + color + "33" } }, [
+      el("div", { class: "value", style: { color: color } }, [String(value)]),
+      el("div", { class: "label" }, [label]),
+    ]);
+  }
+
+  function renderHeader(stats) {
+    return el("div", { class: "header" }, [
+      el("div", {}, [
+        el("h1", {}, ["📅 予約スケジュール"]),
+        el("p", {}, [state.online ? "リアルタイム同期中" : "オフライン"]),
+      ]),
+      el("div", { class: "stats" }, [
+        renderStatBadge("空き", stats.available, "#34d399"),
+        renderStatBadge("予約済", stats.booked, "#f87171"),
+      ]),
+    ]);
+  }
+
+  function renderNav() {
+    var children = [
+      el("button", { class: "nav-btn", onClick: function () { changeWeek(-1); } }, ["← 前週"]),
+      el("span", { class: "nav-label" }, [
+        formatDate(state.weekDates[0]) + " 〜 " + formatDate(state.weekDates[6]),
+      ]),
+      el("button", { class: "nav-btn", onClick: function () { changeWeek(1); } }, ["次週 →"]),
+    ];
+    if (state.weekOffset !== 0) {
+      children.push(
+        el("button", { class: "nav-btn", style: { fontSize: "11px" }, onClick: goToday }, ["今週"])
+      );
+    }
+    return el("div", { class: "nav-row" }, children);
+  }
+
+  function renderDayHeaders() {
+    var cells = [el("div", {}, [])];
+    state.weekDates.forEach(function (date) {
+      var isToday = date.toDateString() === new Date().toDateString();
+      var isSun = date.getDay() === 0;
+      var isSat = date.getDay() === 6;
+      var dowClass = "dow" + (isSun ? " sun" : isSat ? " sat" : "");
+      cells.push(
+        el("div", { class: "day-cell" + (isToday ? " today" : "") }, [
+          el("div", { class: dowClass }, [DAY_NAMES[date.getDay()]]),
+          el("div", { class: "date" }, [formatDate(date)]),
+        ])
+      );
+    });
+    return el("div", { class: "day-header-row" }, cells);
+  }
+
+  function renderTimeRow(time, today) {
+    var cells = [el("div", { class: "time-label" }, [time])];
+
+    state.weekDates.forEach(function (date) {
+      var booked = isBooked(date, time);
+      var isPast = date < today;
+      // Past+available slots are not clickable. Past+booked slots also
+      // can't be cancelled (no point cancelling something already over).
+      var disabled = isPast || !state.online;
+
+      var btnClass = "slot-btn " + (booked ? "booked" : "available") + (isPast ? " past" : "");
+      var btn = el(
+        "button",
+        {
+          class: btnClass,
+          disabled: disabled,
+          title: booked ? "予約済み（クリックでキャンセル）" : isPast ? "" : "クリックして予約",
+          onClick: function () {
+            if (disabled) return;
+            openModal(date, time);
+          },
+        },
+        [booked ? "✗" : "○"]
+      );
+
+      cells.push(el("div", { class: "cell-wrap" }, [btn]));
+    });
+
+    return el("div", { class: "time-row" }, cells);
+  }
+
+  function renderGrid() {
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    var inner = [renderDayHeaders()];
+    TIME_SLOTS.forEach(function (time) {
+      inner.push(renderTimeRow(time, today));
+    });
+
+    return el("div", { class: "grid-scroll" }, [
+      el("div", { class: "grid-inner" }, inner),
+    ]);
+  }
+
+  function renderLegend() {
+    return el("div", { class: "legend" }, [
+      el("span", { style: { color: "#34d399" } }, ["○ 空き（クリックで予約）"]),
+      el("span", { style: { color: "#f87171" } }, ["✗ 予約済み（クリックでキャンセル）"]),
+    ]);
+  }
+
+  function renderPulse() {
+    return el("div", { class: "pulse-indicator" }, [
+      el("span", { class: "pulse-dot" + (state.online ? "" : " offline") }, []),
+      state.online ? "リアルタイム同期中" : "接続できません",
+    ]);
+  }
+
+  // ── Modal: booking form ────────────────────────────────────
+  function renderBookForm(slot) {
+    var errors = state.modalErrors;
+
+    var nameInput = el("input", {
+      type: "text",
+      placeholder: "山田 太郎",
+      class: errors.name ? "error" : "",
+    });
+    var phoneInput = el("input", {
+      type: "tel",
+      placeholder: "090-0000-0000",
+      class: errors.phone ? "error" : "",
+    });
+    var emailInput = el("input", {
+      type: "email",
+      placeholder: "example@email.com（任意）",
+      class: errors.email ? "error" : "",
+    });
+
+    emailInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") doSubmit();
+    });
+
+    function doSubmit() {
+      confirmBooking(nameInput.value, phoneInput.value, emailInput.value);
+    }
+
+    var confirmBtn = el(
+      "button",
+      {
+        class: "btn-confirm" + (state.saving ? " saving" : ""),
+        disabled: state.saving,
+        onClick: doSubmit,
+      },
+      [state.saving ? "予約中..." : "予約を確定する"]
+    );
+
+    var cancelBtn = el(
+      "button",
+      { class: "btn-cancel", disabled: state.saving, onClick: closeModal },
+      ["やめる"]
+    );
+
+    var nameField = el("div", { class: "field" }, [
+      el("label", {}, ["お名前 ", el("span", { class: "req" }, ["*"])]),
+      nameInput,
+      errors.name ? el("div", { class: "error-msg" }, [errors.name]) : null,
+    ]);
+
+    var phoneField = el("div", { class: "field" }, [
+      el("label", {}, ["連絡先番号 ", el("span", { class: "req" }, ["*"])]),
+      phoneInput,
+      errors.phone ? el("div", { class: "error-msg" }, [errors.phone]) : null,
+    ]);
+
+    var emailField = el("div", { class: "field phone" }, [
+      el("label", {}, ["メールアドレス（予約確認メールをお送りします・任意）"]),
+      emailInput,
+      errors.email ? el("div", { class: "error-msg" }, [errors.email]) : null,
+    ]);
+
+    setTimeout(function () { nameInput.focus(); }, 0);
+
+    return [
+      el("div", { style: { marginBottom: "20px" } }, [
+        el("div", { class: "modal-eyebrow" }, ["予約フォーム"]),
+        el("div", { class: "modal-date" }, [formatDateFull(slot.date)]),
+        el("div", { class: "modal-time-pill" }, ["🕐 " + slot.time]),
+      ]),
+      nameField,
+      phoneField,
+      emailField,
+      el("div", { class: "modal-buttons" }, [cancelBtn, confirmBtn]),
+    ];
+  }
+
+  // ── Modal: code issued right after booking ─────────────────
+  function renderCodeIssued(slot) {
+    var closeBtn = el(
+      "button",
+      { class: "btn-confirm", onClick: closeModal, style: { flex: "1" } },
+      ["閉じる"]
+    );
+
+    return [
+      el("div", { style: { marginBottom: "16px" } }, [
+        el("div", { class: "modal-eyebrow" }, ["予約完了"]),
+        el("div", { class: "modal-date" }, [formatDateFull(slot.date)]),
+        el("div", { class: "modal-time-pill" }, ["🕐 " + slot.time]),
+      ]),
+      el("div", { class: "code-display" }, [
+        el("div", { class: "label" }, ["キャンセルコード"]),
+        el("div", { class: "code" }, [state.issuedCode]),
+        el("div", { class: "hint" }, [
+          "このコードは予約を取り消すときに必要です。スクリーンショットを撮るか、メモしておいてください。",
+        ]),
+      ]),
+      el("div", { class: "modal-buttons" }, [closeBtn]),
+    ];
+  }
+
+  // ── Modal: cancel form (enter code) ─────────────────────────
+  function renderCancelForm(slot) {
+    var errors = state.modalErrors;
+
+    var codeInput = el("input", {
+      type: "text",
+      inputmode: "numeric",
+      placeholder: "123456",
+      maxlength: "6",
+      class: errors.code ? "error" : "",
+      style: { textAlign: "center", fontSize: "20px", letterSpacing: "4px", fontFamily: "'Courier New', monospace" },
+    });
+
+    codeInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") doSubmit();
+    });
+
+    function doSubmit() {
+      confirmCancel(codeInput.value);
+    }
+
+    var confirmBtn = el(
+      "button",
+      {
+        class: "btn-confirm danger" + (state.saving ? " saving" : ""),
+        disabled: state.saving,
+        onClick: doSubmit,
+      },
+      [state.saving ? "確認中..." : "予約を取り消す"]
+    );
+
+    var cancelBtn = el(
+      "button",
+      { class: "btn-cancel", disabled: state.saving, onClick: closeModal },
+      ["戻る"]
+    );
+
+    var codeField = el("div", { class: "field phone" }, [
+      el("label", {}, ["キャンセルコード（6桁） ", el("span", { class: "req" }, ["*"])]),
+      codeInput,
+      errors.code ? el("div", { class: "error-msg" }, [errors.code]) : null,
+    ]);
+
+    setTimeout(function () { codeInput.focus(); }, 0);
+
+    return [
+      el("div", { style: { marginBottom: "20px" } }, [
+        el("div", { class: "modal-eyebrow" }, ["予約のキャンセル"]),
+        el("div", { class: "modal-date" }, [formatDateFull(slot.date)]),
+        el("div", { class: "modal-time-pill" }, ["🕐 " + slot.time]),
+      ]),
+      el("div", { style: { fontSize: "12px", color: "rgba(255,255,255,0.5)", marginBottom: "16px", lineHeight: "1.6" } }, [
+        "予約時に表示された6桁のキャンセルコードを入力してください。",
+      ]),
+      codeField,
+      el("div", { class: "modal-buttons" }, [cancelBtn, confirmBtn]),
+    ];
+  }
+
+  function renderModal() {
+    if (!state.modal) return null;
+    var slot = state.modal;
+
+    var boxChildren;
+    if (state.modalMode === "code") {
+      boxChildren = renderCodeIssued(slot);
+    } else if (state.modalMode === "cancel") {
+      boxChildren = renderCancelForm(slot);
+    } else {
+      boxChildren = renderBookForm(slot);
+    }
+
+    var box = el("div", { class: "modal-box" }, boxChildren);
+
+    var overlay = el(
+      "div",
+      {
+        class: "modal-overlay",
+        onClick: function (e) {
+          if (e.target === e.currentTarget) closeModal();
+        },
+      },
+      [box]
+    );
+
+    return overlay;
+  }
+
+  function renderToast() {
+    if (!state.toast) return null;
+    var icon = state.toastError ? "⚠️" : "✅";
+    return el("div", { class: "toast" + (state.toastError ? " error" : "") }, [icon + " " + state.toast]);
+  }
+
+  function render() {
+    var stats = computeStats();
+    root.innerHTML = "";
+
+    if (state.loading) {
+      root.appendChild(el("div", { class: "loading-msg" }, ["読み込み中..."]));
+      return;
+    }
+
+    root.appendChild(renderHeader(stats));
+    root.appendChild(renderNav());
+    root.appendChild(renderGrid());
+    root.appendChild(renderLegend());
+    root.appendChild(renderPulse());
+    root.appendChild(el("a", { class: "owner-link", href: "owner.html" }, ["店舗オーナー用ログイン"]));
+
+    var modal = renderModal();
+    if (modal) root.appendChild(modal);
+
+    var toast = renderToast();
+    if (toast) root.appendChild(toast);
+  }
+
+  render();
+  attachListener();
+})();
+</script>
+
+</body>
+</html>
