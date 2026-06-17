@@ -634,7 +634,7 @@
   // and ignore the response. Failures here must never block the booking/cancel flow.
   var NOTIFY_URL = "https://script.google.com/macros/s/AKfycbyrYcdIbQ19gP0bUJqRT6Vxqk66RfAebU1WchqIj93zjEnX4BjWlvSXPvh2t18vq9-0/exec";
 
-  function notifyOwner(action, name, phone, dateStr, time) {
+  function notifyOwner(action, name, phone, dateStr, time, email) {
     try {
       fetch(NOTIFY_URL, {
         method: "POST",
@@ -646,6 +646,7 @@
           phone: phone,
           date: dateStr,
           time: time,
+          email: email || "",
         }),
       }).catch(function (err) {
         console.warn("Owner notification failed (booking itself still succeeded)", err);
@@ -655,11 +656,14 @@
     }
   }
 
-  function confirmBooking(name, phone) {
+  function confirmBooking(name, phone, email) {
     var errors = {};
     if (!name.trim()) errors.name = "お名前を入力してください";
     if (!phone.trim()) errors.phone = "連絡先番号を入力してください";
     else if (!/^[\d\-\+\(\)\s]+$/.test(phone)) errors.phone = "正しい電話番号を入力してください";
+    if (email && email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errors.email = "正しいメールアドレスを入力してください";
+    }
 
     if (Object.keys(errors).length > 0) {
       setState({ modalErrors: errors });
@@ -673,6 +677,7 @@
     var slotRef = db.collection("slots").doc(id);
     var privateRef = slotRef.collection("private").doc("info");
     var code = generateCancelCode();
+    var emailTrimmed = (email || "").trim();
 
     // Use a transaction so two people clicking the same slot at once
     // can't both succeed (whoever commits first wins; the loser sees an error).
@@ -691,12 +696,13 @@
         tx.set(privateRef, {
           name: name.trim(),
           phone: phone.trim(),
+          email: emailTrimmed,
           bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
         });
       });
     }).then(function () {
       setState({ saving: false, modalErrors: {}, modalMode: "code", issuedCode: code });
-      notifyOwner("book", name.trim(), phone.trim(), dateKey(modal.date), modal.time);
+      notifyOwner("book", name.trim(), phone.trim(), dateKey(modal.date), modal.time, emailTrimmed);
     }).catch(function (err) {
       console.error("Booking failed", err);
       setState({ saving: false });
@@ -889,13 +895,18 @@
       placeholder: "090-0000-0000",
       class: errors.phone ? "error" : "",
     });
+    var emailInput = el("input", {
+      type: "email",
+      placeholder: "example@email.com（任意）",
+      class: errors.email ? "error" : "",
+    });
 
-    phoneInput.addEventListener("keydown", function (e) {
+    emailInput.addEventListener("keydown", function (e) {
       if (e.key === "Enter") doSubmit();
     });
 
     function doSubmit() {
-      confirmBooking(nameInput.value, phoneInput.value);
+      confirmBooking(nameInput.value, phoneInput.value, emailInput.value);
     }
 
     var confirmBtn = el(
@@ -920,10 +931,16 @@
       errors.name ? el("div", { class: "error-msg" }, [errors.name]) : null,
     ]);
 
-    var phoneField = el("div", { class: "field phone" }, [
+    var phoneField = el("div", { class: "field" }, [
       el("label", {}, ["連絡先番号 ", el("span", { class: "req" }, ["*"])]),
       phoneInput,
       errors.phone ? el("div", { class: "error-msg" }, [errors.phone]) : null,
+    ]);
+
+    var emailField = el("div", { class: "field phone" }, [
+      el("label", {}, ["メールアドレス（予約確認メールをお送りします・任意）"]),
+      emailInput,
+      errors.email ? el("div", { class: "error-msg" }, [errors.email]) : null,
     ]);
 
     setTimeout(function () { nameInput.focus(); }, 0);
@@ -936,6 +953,7 @@
       ]),
       nameField,
       phoneField,
+      emailField,
       el("div", { class: "modal-buttons" }, [cancelBtn, confirmBtn]),
     ];
   }
