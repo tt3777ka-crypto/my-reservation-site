@@ -4,17 +4,22 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>予約スケジュール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=M+PLUS+Rounded+1c:wght@400;500;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg-grad: linear-gradient(160deg, #e8faf0 0%, #f0fff6 100%);
-    --line-green: #06C755;
-    --line-green-deep: #04a846;
+    --bg-grad: #f7f8f8;
+    --line-green: #4caf50;
+    --line-green-deep: #3d8b40;
     --text-main: #1a1a1a;
     --text-sub: #888888;
     --text-faint: #aaaaaa;
     --card-bg: #ffffff;
-    --card-border: #f2f2f2;
+    --card-border: #e8e8e8;
     --red: #e0483e;
+    --sat-bg: #e3f3fc;
+    --sun-bg: #fbe9eb;
   }
 
   * { box-sizing: border-box; }
@@ -23,8 +28,9 @@
     margin: 0;
     min-height: 100vh;
     background: var(--bg-grad);
-    font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
+    font-family: 'M PLUS Rounded 1c', 'Kosugi Maru', -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
     color: var(--text-main);
+    font-weight: 500;
   }
 
   button { font-family: inherit; }
@@ -52,8 +58,8 @@
 
   .header h1 {
     margin: 0;
-    font-size: 20px;
-    font-weight: 700;
+    font-size: 23px;
+    font-weight: 900;
     color: var(--text-main);
     display: flex;
     align-items: center;
@@ -95,110 +101,122 @@
     align-items: center;
     justify-content: center;
     gap: 16px;
-    padding: 16px;
+    padding: 14px 16px;
+    background: var(--line-green);
   }
 
   .nav-btn {
-    background: #ffffff;
-    border: 1px solid var(--card-border);
-    color: var(--text-main);
+    background: transparent;
+    border: none;
+    color: #ffffff;
     border-radius: 20px;
-    padding: 7px 16px;
+    padding: 7px 12px;
     cursor: pointer;
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 19px;
+    font-weight: 900;
     transition: all 0.15s;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   }
 
   .nav-label {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--text-main);
-    min-width: 180px;
+    font-size: 17px;
+    font-weight: 800;
+    color: #ffffff;
+    min-width: 200px;
     text-align: center;
   }
 
-  .grid-scroll { overflow-x: auto; padding: 0 16px 32px; }
-  .grid-inner { min-width: 700px; }
+  .grid-scroll { overflow-x: auto; padding: 0 0 32px; background: #ffffff; }
+  .grid-inner { min-width: 700px; background: #ffffff; padding: 4px; border-radius: 14px; }
 
   .day-header-row, .time-row {
     display: grid;
     grid-template-columns: 64px repeat(7, 1fr);
     gap: 4px;
-    margin-bottom: 4px;
+    margin-bottom: 0;
   }
 
-  .time-row { margin-bottom: 3px; }
+  .day-header-group { margin-bottom: 4px; }
+
+  .dow-row { margin-bottom: 3px; }
+  .date-row { margin-bottom: 0; }
+
+  .time-row {
+    margin-bottom: 4px;
+  }
+  .time-row:last-child { margin-bottom: 0; }
 
   .day-cell {
     text-align: center;
-    padding: 8px 4px;
-    border-radius: 12px;
-    background: #f8fdf9;
-    border: 1px solid transparent;
+    padding: 6px 4px;
+    border-radius: 10px;
+    background: #f0f0f0;
   }
 
+  .day-cell.dow-cell { padding: 5px 4px 3px; }
+  .day-cell.date-cell { padding: 3px 4px 7px; }
+
+  .day-cell.sat-col { background: var(--sat-bg); box-shadow: inset 0 0 0 1.5px #2f7bc7; }
+  .day-cell.sun-col { background: var(--sun-bg); box-shadow: inset 0 0 0 1.5px #e0608a; }
+  .cell-wrap.sat-col { background: #ffffff; box-shadow: inset 0 0 0 1.5px #2f7bc7 !important; }
+  .cell-wrap.sun-col { background: #ffffff; box-shadow: inset 0 0 0 1.5px #e0608a !important; }
+
   .day-cell.today {
-    background: var(--line-green);
-    border: 1px solid var(--line-green-deep);
+    box-shadow: inset 0 0 0 2px var(--line-green);
   }
 
   .day-cell .dow {
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 17px;
+    font-weight: 900;
     margin-bottom: 2px;
-    color: var(--text-sub);
+    color: #000000;
   }
   .day-cell .dow.sun { color: var(--red); }
   .day-cell .dow.sat { color: #2f7bc7; }
 
   .day-cell .date {
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 17px;
+    font-weight: 800;
     color: var(--text-main);
   }
-  .day-cell.today .date { font-weight: 700; color: #fff; }
-  .day-cell.today .dow { color: rgba(255,255,255,0.85); }
-  .day-cell.today .dow.sun, .day-cell.today .dow.sat { color: rgba(255,255,255,0.85); }
+  .day-cell.today .date { font-weight: 900; color: var(--line-green-deep); }
 
   .time-label {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     padding-right: 10px;
-    font-size: 11px;
-    color: var(--text-faint);
-    font-weight: 500;
+    font-size: 16px;
+    color: var(--text-main);
+    font-weight: 800;
+    background: #f0f0f0;
+    border-radius: 10px;
   }
 
-  .cell-wrap { position: relative; }
+  .cell-wrap { position: relative; padding: 6px 4px; background: #ffffff; border-radius: 10px; box-shadow: inset 0 0 0 1.5px #d5d5d5; }
 
   .slot-btn {
-    width: 100%;
-    height: 36px;
-    border-radius: 6px;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
     border: none;
+    background: transparent;
     transition: all 0.15s ease;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 26px;
+    font-weight: 900;
+    margin: 0 auto;
   }
 
   .slot-btn.available {
-    background: #effdf3;
-    box-shadow: inset 0 0 0 1px rgba(6,199,85,0.35);
     cursor: pointer;
-    color: var(--line-green-deep);
+    color: var(--line-green);
   }
 
   .slot-btn.booked {
-    background: #fdf0ee;
-    box-shadow: inset 0 0 0 1px rgba(224,72,62,0.3);
     cursor: pointer;
-    color: var(--red);
+    color: #bbbbbb;
   }
 
   .slot-btn.past { opacity: 0.3; cursor: default; }
@@ -314,7 +332,7 @@
     padding: 3px 12px;
     font-size: 13px;
     color: var(--line-green-deep);
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .field { margin-bottom: 16px; }
@@ -323,7 +341,7 @@
   .field label {
     display: block;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-sub);
     margin-bottom: 6px;
   }
@@ -362,7 +380,7 @@
     background: transparent;
     color: var(--text-sub);
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
   }
 
@@ -441,7 +459,7 @@
     border-radius: 14px;
     padding: 12px 20px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     box-shadow: 0 8px 30px rgba(0,0,0,0.2);
     z-index: 2000;
     white-space: nowrap;
@@ -465,7 +483,7 @@
     background: transparent;
     color: var(--text-sub);
     font-size: 13px;
-    font-weight: 600;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.15s;
   }
@@ -829,20 +847,33 @@
   }
 
   function renderDayHeaders() {
-    var cells = [el("div", {}, [])];
+    var dowCells = [el("div", {}, [])];
+    var dateCells = [el("div", {}, [])];
+
     state.weekDates.forEach(function (date) {
       var isToday = date.toDateString() === new Date().toDateString();
       var isSun = date.getDay() === 0;
       var isSat = date.getDay() === 6;
       var dowClass = "dow" + (isSun ? " sun" : isSat ? " sat" : "");
-      cells.push(
-        el("div", { class: "day-cell" + (isToday ? " today" : "") }, [
+      var colClass = (isSun ? " sun-col" : isSat ? " sat-col" : "");
+      var todayClass = isToday ? " today" : "";
+
+      dowCells.push(
+        el("div", { class: "day-cell dow-cell" + colClass + todayClass }, [
           el("div", { class: dowClass }, [DAY_NAMES[date.getDay()]]),
+        ])
+      );
+      dateCells.push(
+        el("div", { class: "day-cell date-cell" + colClass + todayClass }, [
           el("div", { class: "date" }, [formatDate(date)]),
         ])
       );
     });
-    return el("div", { class: "day-header-row" }, cells);
+
+    return el("div", { class: "day-header-group" }, [
+      el("div", { class: "day-header-row dow-row" }, dowCells),
+      el("div", { class: "day-header-row date-row" }, dateCells),
+    ]);
   }
 
   function renderTimeRow(time, today) {
@@ -851,6 +882,8 @@
     state.weekDates.forEach(function (date) {
       var booked = isBooked(date, time);
       var isPast = date < today;
+      var isSun = date.getDay() === 0;
+      var isSat = date.getDay() === 6;
       // Past+available slots are not clickable. Past+booked slots also
       // can't be cancelled (no point cancelling something already over).
       var disabled = isPast || !state.online;
@@ -870,7 +903,8 @@
         [booked ? "✗" : "○"]
       );
 
-      cells.push(el("div", { class: "cell-wrap" }, [btn]));
+      var wrapClass = "cell-wrap" + (isSun ? " sun-col" : isSat ? " sat-col" : "");
+      cells.push(el("div", { class: wrapClass }, [btn]));
     });
 
     return el("div", { class: "time-row" }, cells);
