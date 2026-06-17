@@ -315,6 +315,23 @@
     color: #fff;
   }
 
+  .date-cell-clickable { padding: 0; }
+
+  .date-bulk-btn {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    padding: 6px 4px;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: background 0.15s;
+  }
+  .date-bulk-btn:hover { background: rgba(239,68,68,0.18); }
+
   .time-label {
     display: flex;
     align-items: center;
@@ -500,6 +517,10 @@
     slotModalErrors: {},
     slotModalSaving: false,
     slotModalDetail: null, // { name, phone } loaded for booked-detail
+
+    // Bulk-block-for-day modal
+    bulkBlockDate: null,   // Date, or null when not showing
+    bulkBlockSaving: false,
   };
 
   var root = document.getElementById("app");
@@ -825,6 +846,56 @@
       });
   }
 
+  // ── Bulk block: set every still-available slot on a given day to "blocked" ──
+  // Slots that are already booked are left untouched; already-blocked slots are skipped.
+  function openBulkBlockConfirm(date) {
+    setState({ bulkBlockDate: date });
+  }
+
+  function closeBulkBlockConfirm() {
+    if (state.bulkBlockSaving) return;
+    setState({ bulkBlockDate: null });
+  }
+
+  function confirmBulkBlockDay() {
+    var date = state.bulkBlockDate;
+    if (!date) return;
+    var dk = dateKey(date);
+
+    setState({ bulkBlockSaving: true });
+
+    var availableTimes = TIME_SLOTS.filter(function (time) {
+      var status = state.slotStatus[slotId(date, time)];
+      return status !== "booked" && status !== "blocked";
+    });
+
+    if (availableTimes.length === 0) {
+      setState({ bulkBlockSaving: false, bulkBlockDate: null });
+      return;
+    }
+
+    var batch = db.batch();
+    availableTimes.forEach(function (time) {
+      var ref = db.collection("slots").doc(slotId(date, time));
+      batch.set(ref, {
+        blocked: true,
+        date: dk,
+        time: time,
+        bookedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+
+    batch.commit().then(function () {
+      setState({ bulkBlockSaving: false, bulkBlockDate: null });
+      loadGridForWeek();
+    }).catch(function (err) {
+      console.error("Bulk block failed", err);
+      setState({ bulkBlockSaving: false });
+      window.alert("一括休業の設定に失敗しました。もう一度お試しください。");
+    });
+  }
+
+
   function changeWeek(delta) {
     var newOffset = state.weekOffset + delta;
     var base = new Date();
@@ -963,8 +1034,16 @@
         ])
       );
       dateCells.push(
-        el("div", { class: "day-cell" }, [
-          el("div", { class: "date" }, [formatDate(date)]),
+        el("div", { class: "day-cell date-cell-clickable" }, [
+          el(
+            "button",
+            {
+              class: "date-bulk-btn",
+              title: "この日の空き枠をまとめて休業にする",
+              onClick: function () { openBulkBlockConfirm(date); },
+            },
+            [formatDate(date)]
+          ),
         ])
       );
     });
@@ -1025,7 +1104,7 @@
     }
 
     return el("div", { class: "grid-section" }, [
-      el("div", { class: "grid-section-title" }, ["○をクリックして電話予約や休業設定、×をクリックして詳細確認・取り消しができます"]),
+      el("div", { class: "grid-section-title" }, ["○をクリックして電話予約や休業設定、×をクリックして詳細確認・取り消し、日付をクリックでその日を一括休業にできます"]),
       content,
     ]);
   }
@@ -1167,6 +1246,51 @@
     );
   }
 
+  function renderBulkBlockModal() {
+    if (!state.bulkBlockDate) return null;
+    var date = state.bulkBlockDate;
+
+    var availableCount = TIME_SLOTS.filter(function (time) {
+      var status = state.slotStatus[slotId(date, time)];
+      return status !== "booked" && status !== "blocked";
+    }).length;
+
+    var bookedCount = TIME_SLOTS.filter(function (time) {
+      return state.slotStatus[slotId(date, time)] === "booked";
+    }).length;
+
+    var sub = availableCount + " 件の空き枠を休業にします。";
+    if (bookedCount > 0) {
+      sub += "（すでに予約済みの " + bookedCount + " 件はそのまま残ります）";
+    }
+
+    var box = el("div", { class: "slot-action-box" }, [
+      el("div", { class: "slot-action-title" }, [formatDateFull(date)]),
+      el("div", { class: "slot-action-sub" }, [sub]),
+      el(
+        "button",
+        {
+          class: "slot-action-btn danger",
+          disabled: state.bulkBlockSaving || availableCount === 0,
+          onClick: confirmBulkBlockDay,
+        },
+        [state.bulkBlockSaving ? "設定中..." : availableCount === 0 ? "空き枠がありません" : "この日を一括で休業にする"]
+      ),
+      el("button", { class: "slot-action-btn cancel-link", disabled: state.bulkBlockSaving, onClick: closeBulkBlockConfirm }, ["やめる"]),
+    ]);
+
+    return el(
+      "div",
+      {
+        class: "slot-action-modal-overlay",
+        onClick: function (e) {
+          if (e.target === e.currentTarget) closeBulkBlockConfirm();
+        },
+      },
+      [box]
+    );
+  }
+
   function renderDashboard() {
     var content;
     if (state.loadingBookings) {
@@ -1179,6 +1303,7 @@
       renderHeader(),
       el("div", { class: "content" }, [renderNav(), renderGrid(), content]),
       renderSlotModal(),
+      renderBulkBlockModal(),
     ]);
   }
 
