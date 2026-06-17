@@ -572,7 +572,8 @@
   var state = {
     weekOffset: 0,
     weekDates: getWeekDates(),
-    bookedSlots: {},     // slotId -> true  (public status only, no personal info)
+    bookedSlots: {},     // slotId -> true  (booked OR blocked; public status only, no personal info)
+    blockedSlots: {},    // slotId -> true  (owner-set unavailable; not cancellable by customers)
     loading: true,
     online: false,
     connectionError: null,
@@ -587,6 +588,7 @@
 
   var root = document.getElementById("app");
   var unsubscribe = null;
+  var unsubscribeBlocked = null;
 
   function setState(patch) {
     Object.assign(state, patch);
@@ -594,9 +596,23 @@
   }
 
   // ── Firestore: realtime listener on public status only ────
-  // Collection "slots": each doc { booked: true } — no name/phone here.
+  // Collection "slots": each doc { booked: true } or { blocked: true } — no name/phone here.
+  // "blocked" slots are owner-set unavailable times (e.g. closed, on a break) and are
+  // shown to customers exactly like booked slots (×, not clickable).
+  var latestBooked = {};
+  var latestBlocked = {};
+
+  function mergeAndSetSlots() {
+    var merged = {};
+    Object.keys(latestBooked).forEach(function (k) { merged[k] = true; });
+    Object.keys(latestBlocked).forEach(function (k) { merged[k] = true; });
+    setState({ bookedSlots: merged, blockedSlots: latestBlocked, loading: false, online: true, connectionError: null });
+  }
+
   function attachListener() {
     if (unsubscribe) unsubscribe();
+    if (unsubscribeBlocked) unsubscribeBlocked();
+
     unsubscribe = db.collection("slots")
       .where("booked", "==", true)
       .onSnapshot(
@@ -605,11 +621,28 @@
           snapshot.forEach(function (doc) {
             booked[doc.id] = true;
           });
-          setState({ bookedSlots: booked, loading: false, online: true, connectionError: null });
+          latestBooked = booked;
+          mergeAndSetSlots();
         },
         function (err) {
           console.error("Firestore listener error", err);
           setState({ loading: false, online: false, connectionError: err.message });
+        }
+      );
+
+    unsubscribeBlocked = db.collection("slots")
+      .where("blocked", "==", true)
+      .onSnapshot(
+        function (snapshot) {
+          var blocked = {};
+          snapshot.forEach(function (doc) {
+            blocked[doc.id] = true;
+          });
+          latestBlocked = blocked;
+          mergeAndSetSlots();
+        },
+        function (err) {
+          console.error("Firestore blocked-listener error", err);
         }
       );
   }
@@ -617,6 +650,10 @@
   // ── Derived data ──────────────────────────────────────────
   function isBooked(date, time) {
     return !!state.bookedSlots[slotId(date, time)];
+  }
+
+  function isBlocked(date, time) {
+    return !!state.blockedSlots[slotId(date, time)];
   }
 
   function computeStats() {
@@ -881,12 +918,14 @@
 
     state.weekDates.forEach(function (date) {
       var booked = isBooked(date, time);
+      var blocked = isBlocked(date, time);
       var isPast = date < today;
       var isSun = date.getDay() === 0;
       var isSat = date.getDay() === 6;
       // Past+available slots are not clickable. Past+booked slots also
       // can't be cancelled (no point cancelling something already over).
-      var disabled = isPast || !state.online;
+      // Blocked (owner-set unavailable) slots are never clickable by customers.
+      var disabled = isPast || !state.online || blocked;
 
       var btnClass = "slot-btn " + (booked ? "booked" : "available") + (isPast ? " past" : "");
       var btn = el(
@@ -894,7 +933,7 @@
         {
           class: btnClass,
           disabled: disabled,
-          title: booked ? "予約済み（クリックでキャンセル）" : isPast ? "" : "クリックして予約",
+          title: blocked ? "対応できない時間です" : booked ? "予約済み（クリックでキャンセル）" : isPast ? "" : "クリックして予約",
           onClick: function () {
             if (disabled) return;
             openModal(date, time);
